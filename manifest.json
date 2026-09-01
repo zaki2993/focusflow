@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "zakarch.focusflow",
+  "name": "Focus Flow",
+  "version": "1.0.0",
+  "author": "zakaryae",
+  "license": "MIT",
+  "description": "Unified focus timer + task manager. Assign tasks to pomodoro sessions, track your flow.",
+  "kinds": ["service", "bar-widget"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Focus Flow",
+    "description": "Pomodoro timer + task list in one. Link tasks to sessions and track your flow.",
+    "category": "Productivity",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}
