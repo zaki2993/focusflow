@@ -21,11 +21,6 @@ Panel {
   readonly property color fg:  bar ? bar.foreground : Color.foreground
   readonly property string ff: bar ? bar.fontFamily : Style.font.family
 
-  // ── Phase-aware accent colors ───────────────────────────────────────────────
-  readonly property color phaseColor: svc && svc.phase === "break" ? "#22c55e"
-    : svc && svc.phase === "focus" ? Color.accent
-    : Qt.darker(root.fg, 1.3)
-
   // ── Active tab (0: Focus, 1: Tasks, 2: Settings) ───────────────────────────
   property int activeTab: 0
 
@@ -70,7 +65,7 @@ Panel {
     open: root.opened
     centerOnBar: true
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(420))
+    contentWidth: panel.fittedContentWidth(Style.space(400))
     contentHeight: panel.fittedContentHeight(mainCol.implicitHeight)
 
     PanelKeyCatcher {
@@ -97,40 +92,21 @@ Panel {
       Column {
         id: mainCol
         width: parent.width
-        spacing: Style.space(14)
+        spacing: Style.space(10)
 
         // ════════════ SEGMENTED TAB BAR ═════════════════════════════════════
-        Item {
+        Rectangle {
           width: parent.width
-          height: Style.space(40)
-
-          // Background pill
-          Rectangle {
-            anchors.fill: parent
-            radius: height / 2
-            color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.05)
-            border.width: 1
-            border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
-          }
-
-          // Sliding active indicator
-          Rectangle {
-            id: tabIndicator
-            width: (parent.width - Style.space(8)) / 3
-            height: parent.height - Style.space(6)
-            y: Style.space(3)
-            x: Style.space(4) + root.activeTab * (width + Style.space(1))
-            radius: height / 2
-            color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18)
-            border.width: 1
-            border.color: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35)
-
-            Behavior on x { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-          }
+          height: Style.space(42)
+          radius: Style.cornerRadius
+          color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
+          border.width: 1
+          border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.10)
 
           Row {
             anchors.fill: parent
             anchors.margins: Style.space(4)
+            spacing: Style.space(4)
 
             Repeater {
               model: [
@@ -138,21 +114,26 @@ Panel {
                 { icon: "󰏫", label: "Tasks" },
                 { icon: "󰒓", label: "Settings" }
               ]
-              delegate: Item {
+              delegate: Rectangle {
                 required property int index
                 required property var modelData
-                width: (parent.width) / 3
+                width: (parent.width - Style.space(8)) / 3
                 height: parent.height
+                radius: Math.max(2, Style.cornerRadius - 2)
+                color: root.activeTab === index
+                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22)
+                  : "transparent"
+                border.width: root.activeTab === index ? 1 : 0
+                border.color: Color.accent
 
                 Row {
                   anchors.centerIn: parent
                   spacing: Style.space(6)
                   Text {
                     text: modelData.icon
-                    color: root.activeTab === index ? Color.accent : Qt.darker(root.fg, 1.4)
+                    color: root.activeTab === index ? Color.accent : Qt.darker(root.fg, 1.5)
                     font.family: root.ff
                     font.pixelSize: Style.font.body
-                    Behavior on color { ColorAnimation { duration: 200 } }
                   }
                   Text {
                     text: modelData.label
@@ -160,13 +141,11 @@ Panel {
                     font.family: root.ff
                     font.pixelSize: Style.font.body
                     font.bold: root.activeTab === index
-                    Behavior on color { ColorAnimation { duration: 200 } }
                   }
                 }
 
                 MouseArea {
                   anchors.fill: parent
-                  cursorShape: Qt.PointingHandCursor
                   onClicked: root.activeTab = index
                 }
               }
@@ -181,82 +160,81 @@ Panel {
                         : root.activeTab === 1 ? tasksPage.implicitHeight
                         : settingsPage.implicitHeight
 
-          Behavior on implicitHeight { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
-
           // ──────────────────────────────────────────────────────────────────
           // TAB 0: FOCUS PAGE
           // ──────────────────────────────────────────────────────────────────
           Column {
             id: focusPage
             width: parent.width
-            spacing: Style.space(14)
+            spacing: Style.space(10)
             visible: root.activeTab === 0
 
             // Active Task Card / Banner
             Rectangle {
               width: parent.width
-              height: Style.space(54)
+              height: Style.space(56)
               radius: Style.cornerRadius * 1.5
               color: root.svc && root.svc.activeTask
-                ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.10)
+                ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
                 : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
               border.width: 1
               border.color: root.svc && root.svc.activeTask
-                ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.30)
-                : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
-              Behavior on color { ColorAnimation { duration: 300 } }
-              Behavior on border.color { ColorAnimation { duration: 300 } }
+                ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
+                : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.1)
+              
+              Behavior on color { ColorAnimation { duration: 250 } }
 
               Row {
                 anchors.fill: parent
-                anchors.leftMargin: Style.space(14)
-                anchors.rightMargin: Style.space(10)
-                spacing: Style.space(10)
+                anchors.leftMargin: Style.space(16)
+                anchors.rightMargin: Style.space(12)
+                spacing: Style.space(12)
 
-                // Circular icon badge
+                // Task Icon container
                 Rectangle {
                   anchors.verticalCenter: parent.verticalCenter
-                  width: Style.space(32)
-                  height: Style.space(32)
+                  width: Style.space(34)
+                  height: Style.space(34)
                   radius: width / 2
                   color: root.svc && root.svc.activeTask
-                    ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.20)
-                    : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
-
+                    ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
+                    : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
+                  
                   Text {
                     anchors.centerIn: parent
                     text: root.svc && root.svc.activeTask ? "󰌵" : "󰏫"
-                    color: root.svc && root.svc.activeTask ? Color.accent : Qt.darker(root.fg, 1.3)
+                    color: root.svc && root.svc.activeTask ? Color.accent : Qt.darker(root.fg, 1.2)
                     font.family: root.ff
                     font.pixelSize: Style.font.body
                   }
                 }
 
                 Column {
-                  width: parent.width - Style.space(130)
+                  width: parent.width - Style.space(136)
                   anchors.verticalCenter: parent.verticalCenter
-                  spacing: 1
+                  spacing: 2
 
                   Text {
                     width: parent.width
-                    text: root.svc && root.svc.activeTask ? root.svc.activeTask.title : "No task linked"
+                    text: root.svc && root.svc.activeTask ? root.svc.activeTask.title : "No task linked to timer"
                     color: root.fg
                     font.family: root.ff
                     font.pixelSize: Style.font.body
-                    font.bold: root.svc && root.svc.activeTask !== null
+                    font.bold: true
                     elide: Text.ElideRight
                   }
 
                   Text {
                     text: root.svc && root.svc.activeTask
-                      ? "󰔛 " + (root.svc.activeTask.pomos || 0) + " pomos"
-                      : "Link a task from the Tasks tab"
-                    color: Qt.darker(root.fg, 1.5)
+                      ? "󰔛 " + (root.svc.activeTask.pomos || 0) + " pomodoros completed on this task"
+                      : "Link a task from the Tasks tab to track focus"
+                    color: Qt.darker(root.fg, 1.4)
                     font.family: root.ff
                     font.pixelSize: Style.font.caption
                   }
                 }
 
+                // Action button (Unlink if active, or Select Task button)
                 Button {
                   anchors.verticalCenter: parent.verticalCenter
                   text: root.svc && root.svc.activeTask ? "Unlink" : "Select"
@@ -271,120 +249,187 @@ Panel {
               }
             }
 
-            // ── Circular Timer ──────────────────────────────────────────────
-            Item {
+            // 🌟 Creative Hero Timer Container Card 🌟
+            Rectangle {
+              id: heroCard
               width: parent.width
-              height: Style.space(230)
+              height: Style.space(220)
+              radius: Style.cornerRadius * 3
+              color: root.svc && root.svc.phase === "focus" && root.svc.running
+                ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.05)
+                : root.svc && root.svc.phase === "break" && root.svc.running
+                  ? Qt.rgba(0.13, 0.77, 0.36, 0.05)
+                  : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
+              border.width: 1
+              border.color: root.svc && root.svc.phase === "focus" && root.svc.running
+                ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35)
+                : root.svc && root.svc.phase === "break" && root.svc.running
+                  ? Qt.rgba(0.13, 0.77, 0.36, 0.35)
+                  : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.1)
 
-              // Outer ring background
-              Canvas {
-                id: ringBg
+              Behavior on color { ColorAnimation { duration: 400 } }
+              Behavior on border.color { ColorAnimation { duration: 400 } }
+
+              // Dynamic animated glow behind the timer
+              Rectangle {
                 anchors.centerIn: parent
-                width: Style.space(180)
-                height: Style.space(180)
-                onPaint: {
-                  var ctx = getContext("2d")
-                  ctx.clearRect(0, 0, width, height)
-                  ctx.beginPath()
-                  ctx.arc(width / 2, height / 2, width / 2 - 8, 0, Math.PI * 2)
-                  ctx.lineWidth = 6
-                  ctx.strokeStyle = Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
-                  ctx.stroke()
+                width: parent.width * 0.75
+                height: parent.height * 0.75
+                radius: width / 2
+                color: root.svc && root.svc.phase === "break" ? "#22c55e" : Color.accent
+                opacity: root.svc && root.svc.running ? 0.08 : 0.0
+                Behavior on opacity { NumberAnimation { duration: 1000 } }
+                
+                SequentialAnimation on scale {
+                  loops: Animation.Infinite
+                  running: root.svc && root.svc.running
+                  NumberAnimation { from: 0.95; to: 1.05; duration: 2500; easing.type: Easing.InOutSine }
+                  NumberAnimation { from: 1.05; to: 0.95; duration: 2500; easing.type: Easing.InOutSine }
                 }
               }
 
-              // Progress ring
-              Canvas {
-                id: ringProgress
-                anchors.centerIn: parent
-                width: Style.space(180)
-                height: Style.space(180)
-                readonly property real prog: root.progress
-                readonly property color ringColor: root.phaseColor
-                onProgChanged: requestPaint()
-                onRingColorChanged: requestPaint()
-
-                onPaint: {
-                  var ctx = getContext("2d")
-                  ctx.clearRect(0, 0, width, height)
-                  if (prog <= 0) return
-                  var cx = width / 2, cy = height / 2, r = width / 2 - 8
-                  var startAngle = -Math.PI / 2
-                  var endAngle = startAngle + (Math.PI * 2 * prog)
-                  ctx.beginPath()
-                  ctx.arc(cx, cy, r, startAngle, endAngle)
-                  ctx.lineWidth = 6
-                  ctx.lineCap = "round"
-                  ctx.strokeStyle = ringColor
-                  ctx.stroke()
-                }
-              }
-
-              // Center content
               Column {
                 anchors.centerIn: parent
-                spacing: Style.space(4)
+                spacing: Style.space(12)
 
-                // Phase badge
+                // Phase Badge Pill with subtle glow
                 Rectangle {
                   anchors.horizontalCenter: parent.horizontalCenter
-                  width: phaseText.implicitWidth + Style.space(20)
-                  height: Style.space(22)
+                  width: phaseText.implicitWidth + Style.space(32)
+                  height: Style.space(28)
                   radius: height / 2
-                  color: Qt.rgba(root.phaseColor.r, root.phaseColor.g, root.phaseColor.b, 0.12)
-
+                  color: root.svc && root.svc.phase === "focus"
+                    ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.15)
+                    : root.svc && root.svc.phase === "break"
+                      ? Qt.rgba(0.13, 0.77, 0.36, 0.15)
+                      : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
+                  border.width: 1
+                  border.color: root.svc && root.svc.phase === "focus"
+                    ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
+                    : root.svc && root.svc.phase === "break"
+                      ? Qt.rgba(0.13, 0.77, 0.36, 0.4)
+                      : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.12)
+                  
                   Text {
                     id: phaseText
                     anchors.centerIn: parent
-                    text: root.svc && root.svc.phase === "focus" ? "FOCUS"
-                      : root.svc && root.svc.phase === "break" ? "BREAK"
-                      : "IDLE"
-                    color: root.phaseColor
+                    text: root.svc && root.svc.phase === "focus" ? "󱎫 DEEP FOCUS" : root.svc && root.svc.phase === "break" ? "󰅶 BREAK TIME" : "󰒲 READY TO FLOW"
+                    color: root.svc && root.svc.phase === "focus"
+                      ? Color.accent
+                      : root.svc && root.svc.phase === "break"
+                        ? "#4ade80"
+                        : root.fg
                     font.family: root.ff
-                    font.pixelSize: Style.font.caption - 1
+                    font.pixelSize: Style.font.caption
                     font.bold: true
                     font.letterSpacing: 2.0
                   }
                 }
 
-                // Big time display
-                Text {
+                // Big Digital Countdown with drop shadow glow
+                Item {
                   anchors.horizontalCenter: parent.horizontalCenter
-                  text: root.heroTime
-                  color: root.fg
-                  font.family: root.ff
-                  font.pixelSize: 48
-                  font.bold: true
-                  font.letterSpacing: 2
+                  width: heroText.implicitWidth
+                  height: heroText.implicitHeight
+                  
+                  Text {
+                    anchors.centerIn: parent
+                    text: root.heroTime
+                    color: root.svc && root.svc.phase === "break" ? "#22c55e" : Color.accent
+                    font.family: root.ff
+                    font.pixelSize: 84
+                    font.bold: true
+                    opacity: root.svc && root.svc.running ? 0.25 : 0.0
+                    scale: 1.02
+                    Behavior on opacity { NumberAnimation { duration: 500 } }
+                  }
+                  
+                  Text {
+                    id: heroText
+                    anchors.centerIn: parent
+                    text: root.heroTime
+                    color: root.fg
+                    font.family: root.ff
+                    font.pixelSize: 84
+                    font.bold: true
+                    font.letterSpacing: 1.5
+                  }
                 }
 
-                // Status
+                // Status line
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: root.statusLine
-                  color: Qt.darker(root.fg, 1.5)
+                  color: Qt.darker(root.fg, 1.4)
                   font.family: root.ff
-                  font.pixelSize: Style.font.caption
+                  font.pixelSize: Style.font.body
+                  font.italic: true
                 }
-              }
 
-              // Pulsing outer glow when running
-              Rectangle {
-                anchors.centerIn: parent
-                width: Style.space(190)
-                height: Style.space(190)
-                radius: width / 2
-                color: "transparent"
-                border.width: 2
-                border.color: root.phaseColor
-                opacity: 0
-                visible: root.svc && root.svc.running
+                // Enhanced Progress Bar
+                Item {
+                  width: focusPage.width - Style.space(60)
+                  height: Style.space(12)
+                  anchors.horizontalCenter: parent.horizontalCenter
 
-                SequentialAnimation on opacity {
-                  loops: Animation.Infinite
-                  running: root.svc && root.svc.running
-                  NumberAnimation { from: 0; to: 0.3; duration: 1500; easing.type: Easing.InOutQuad }
-                  NumberAnimation { from: 0.3; to: 0; duration: 1500; easing.type: Easing.InOutQuad }
+                  // Background track
+                  Rectangle {
+                    anchors.fill: parent
+                    radius: height / 2
+                    color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
+                    border.width: 1
+                    border.color: Qt.rgba(0, 0, 0, 0.2)
+                  }
+                  
+                  // Fill
+                  Rectangle {
+                    id: progressFill
+                    width: Math.max(height, Math.round(parent.width * root.progress))
+                    height: parent.height
+                    radius: parent.radius
+                    color: root.svc && root.svc.phase === "break" ? "#22c55e" : Color.accent
+                    
+                    Behavior on width { NumberAnimation { duration: 500; easing.type: Easing.OutQuint } }
+
+                    // Highlight for 3D feel
+                    Rectangle {
+                      anchors.top: parent.top
+                      anchors.left: parent.left
+                      anchors.right: parent.right
+                      height: parent.height / 2
+                      radius: parent.radius
+                      color: "#ffffff"
+                      opacity: 0.2
+                    }
+
+                    // Glowing dot at the end
+                    Rectangle {
+                      anchors.right: parent.right
+                      anchors.verticalCenter: parent.verticalCenter
+                      anchors.rightMargin: Style.space(2)
+                      width: Style.space(8)
+                      height: Style.space(8)
+                      radius: width / 2
+                      color: "#ffffff"
+                      visible: root.svc && root.svc.running
+                      
+                      Rectangle {
+                        anchors.centerIn: parent
+                        width: parent.width * 3
+                        height: parent.height * 3
+                        radius: width / 2
+                        color: "#ffffff"
+                        opacity: 0.4
+                        
+                        SequentialAnimation on scale {
+                          loops: Animation.Infinite
+                          running: root.svc && root.svc.running
+                          NumberAnimation { from: 0.6; to: 1.4; duration: 1000; easing.type: Easing.OutQuad }
+                          NumberAnimation { from: 1.4; to: 0.6; duration: 1000; easing.type: Easing.InQuad }
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -423,6 +468,8 @@ Panel {
               }
             }
 
+            PanelSeparator { foreground: root.fg }
+
             // Stats Grid Cards
             Row {
               width: parent.width
@@ -438,37 +485,38 @@ Panel {
                 Rectangle {
                   required property var modelData
                   width: (focusPage.width - Style.space(16)) / 3
-                  height: Style.space(70)
-                  radius: Style.cornerRadius * 1.5
+                  height: Style.space(56)
+                  radius: Style.cornerRadius
                   color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
                   border.width: 1
-                  border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
+                  border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
 
                   Column {
                     anchors.centerIn: parent
-                    spacing: Style.space(4)
+                    spacing: 1
 
-                    Text {
+                    Row {
                       anchors.horizontalCenter: parent.horizontalCenter
-                      text: modelData.icon
-                      color: Color.accent
-                      font.family: root.ff
-                      font.pixelSize: Style.font.body
-                    }
-
-                    Text {
-                      anchors.horizontalCenter: parent.horizontalCenter
-                      text: String(modelData.value)
-                      color: root.fg
-                      font.family: root.ff
-                      font.pixelSize: 24
-                      font.bold: true
+                      spacing: Style.space(4)
+                      Text {
+                        text: modelData.icon
+                        color: Color.accent
+                        font.family: root.ff
+                        font.pixelSize: Style.font.body
+                      }
+                      Text {
+                        text: String(modelData.value)
+                        color: root.fg
+                        font.family: root.ff
+                        font.pixelSize: Style.font.title
+                        font.bold: true
+                      }
                     }
 
                     Text {
                       anchors.horizontalCenter: parent.horizontalCenter
                       text: modelData.label
-                      color: Qt.darker(root.fg, 1.5)
+                      color: Qt.darker(root.fg, 1.6)
                       font.family: root.ff
                       font.pixelSize: Style.font.caption
                     }
@@ -500,7 +548,7 @@ Panel {
                 }
                 Text {
                   text: root.svc
-                    ? "󰄯 " + root.svc.openCount + " open · " + root.svc.tasks.length + " total"
+                    ? "󰄯 " + root.svc.openCount + " open tasks · " + root.svc.tasks.length + " total"
                     : "Task list"
                   color: Qt.darker(root.fg, 1.5)
                   font.family: root.ff; font.pixelSize: Style.font.caption
@@ -525,18 +573,17 @@ Panel {
 
               Rectangle {
                 width: parent.width - Style.space(52)
-                height: Style.space(44)
-                radius: height / 2
-                color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.05)
+                height: Style.space(42)
+                radius: Style.cornerRadius
+                color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
                 border.width: 1
                 border.color: taskInput.activeFocus
                   ? Color.accent
-                  : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.12)
-                Behavior on border.color { ColorAnimation { duration: 200 } }
+                  : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.16)
 
                 Row {
                   anchors.fill: parent
-                  anchors.leftMargin: Style.space(16)
+                  anchors.leftMargin: Style.space(12)
                   anchors.rightMargin: Style.space(8)
                   spacing: Style.space(8)
 
@@ -546,12 +593,11 @@ Panel {
                     color: taskInput.activeFocus ? Color.accent : Qt.darker(root.fg, 1.6)
                     font.family: root.ff
                     font.pixelSize: Style.font.body
-                    Behavior on color { ColorAnimation { duration: 200 } }
                   }
 
                   TextInput {
                     id: taskInput
-                    width: parent.width - Style.space(28)
+                    width: parent.width - Style.space(24)
                     anchors.verticalCenter: parent.verticalCenter
                     color: root.fg
                     font.family: root.ff
@@ -565,7 +611,7 @@ Panel {
                     Text {
                       visible: !parent.text
                       anchors.verticalCenter: parent.verticalCenter
-                      text: "Add a new task…"
+                      text: "Add a new task..."
                       color: Qt.darker(root.fg, 1.7)
                       font: parent.font
                     }
@@ -576,7 +622,7 @@ Panel {
               Button {
                 text: "󰐕 Add"
                 width: Style.space(44)
-                height: Style.space(44)
+                height: Style.space(42)
                 foreground: root.fg
                 accent: Color.accent
                 fontFamily: root.ff
@@ -588,23 +634,23 @@ Panel {
 
             PanelSeparator { foreground: root.fg }
 
-            // Empty State
+            // Empty State Graphic
             Rectangle {
               visible: !root.svc || root.svc.tasks.length === 0
               width: parent.width
-              height: Style.space(130)
-              radius: Style.cornerRadius * 1.5
+              height: Style.space(120)
+              radius: Style.cornerRadius
               color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
 
               Column {
                 anchors.centerIn: parent
-                spacing: Style.space(8)
+                spacing: Style.space(6)
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: "󰗡"
-                  color: Qt.darker(root.fg, 1.6)
+                  color: Qt.darker(root.fg, 1.7)
                   font.family: root.ff
-                  font.pixelSize: 48
+                  font.pixelSize: 42
                 }
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
@@ -617,7 +663,7 @@ Panel {
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: "Add a task above to start tracking your focus"
-                  color: Qt.darker(root.fg, 1.5)
+                  color: Qt.darker(root.fg, 1.6)
                   font.family: root.ff
                   font.pixelSize: Style.font.caption
                 }
@@ -632,55 +678,42 @@ Panel {
                 readonly property bool isActive: root.svc && root.svc.activeTaskId === String(modelData.id)
 
                 width: tasksPage.width
-                height: Style.space(52)
-                radius: Style.cornerRadius * 1.2
+                height: Style.space(48)
+                radius: Style.cornerRadius
                 color: isActive
-                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12)
-                  : taskMouse.containsMouse
-                    ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
-                    : modelData.done
-                      ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.02)
-                      : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.05)
+                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.16)
+                  : modelData.done
+                    ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
+                    : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.07)
                 border.width: 1
                 border.color: isActive
-                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35)
-                  : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
-                Behavior on color { ColorAnimation { duration: 150 } }
-
-                MouseArea {
-                  id: taskMouse
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  acceptedButtons: Qt.NoButton
-                }
+                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.40)
+                  : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
 
                 Row {
                   anchors.fill: parent
-                  anchors.leftMargin: Style.space(12)
-                  anchors.rightMargin: Style.space(10)
+                  anchors.leftMargin: Style.space(10)
+                  anchors.rightMargin: Style.space(8)
                   spacing: Style.space(10)
 
                   // Toggle Checkbox
                   Rectangle {
-                    width: Style.space(22); height: width
+                    width: Style.space(24); height: width
                     anchors.verticalCenter: parent.verticalCenter
-                    radius: Style.space(6)
+                    radius: width / 2
                     color: modelData.done ? Color.accent : "transparent"
                     border.width: 2
                     border.color: modelData.done ? Color.accent : Qt.darker(root.fg, 1.4)
-                    Behavior on color { ColorAnimation { duration: 200 } }
 
                     Text {
                       anchors.centerIn: parent
                       text: "✓"
                       visible: modelData.done
                       color: Color.background
-                      font.pixelSize: 11
                       font.bold: true
                     }
                     MouseArea {
                       anchors.fill: parent
-                      cursorShape: Qt.PointingHandCursor
                       onClicked: root.svc.toggleTask(modelData.id)
                     }
                   }
@@ -694,12 +727,11 @@ Panel {
                     Text {
                       width: parent.width
                       text: modelData.title
-                      color: modelData.done ? Qt.darker(root.fg, 1.7) : root.fg
+                      color: modelData.done ? Qt.darker(root.fg, 1.8) : root.fg
                       font.family: root.ff
                       font.pixelSize: Style.font.body
                       font.strikeout: modelData.done
                       elide: Text.ElideRight
-                      wrapMode: Text.NoWrap
                     }
 
                     Row {
@@ -716,7 +748,7 @@ Panel {
 
                       Text {
                         visible: isActive
-                        text: "· Active"
+                        text: "· Active in Timer"
                         color: Color.accent
                         font.family: root.ff
                         font.pixelSize: Style.font.caption
@@ -757,30 +789,30 @@ Panel {
           Column {
             id: settingsPage
             width: parent.width
-            spacing: Style.space(14)
+            spacing: Style.space(12)
             visible: root.activeTab === 2
 
             // Timer Durations Section Card
             Rectangle {
               width: parent.width
-              height: timerSettingsCol.implicitHeight + Style.space(28)
-              radius: Style.cornerRadius * 1.5
+              height: timerSettingsCol.implicitHeight + Style.space(24)
+              radius: Style.cornerRadius
               color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
               border.width: 1
-              border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
+              border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
 
               Column {
                 id: timerSettingsCol
                 anchors.fill: parent
-                anchors.margins: Style.space(14)
-                spacing: Style.space(14)
+                anchors.margins: Style.space(12)
+                spacing: Style.space(12)
 
                 PanelSectionHeader { text: "󱎫 Duration Config"; foreground: root.fg; fontFamily: root.ff }
 
                 // Focus Duration Row + Presets
                 Column {
                   width: parent.width
-                  spacing: Style.space(8)
+                  spacing: Style.space(6)
 
                   Row {
                     width: parent.width
@@ -845,7 +877,7 @@ Panel {
                 // Break Duration Row + Presets
                 Column {
                   width: parent.width
-                  spacing: Style.space(8)
+                  spacing: Style.space(6)
 
                   Row {
                     width: parent.width
@@ -907,68 +939,73 @@ Panel {
 
                 PanelSeparator { foreground: root.fg }
 
-                // Automation Rules
+                // Automation Rules (Upgraded UI)
                 PanelSectionHeader { text: "󰔎 Automation"; foreground: root.fg; fontFamily: root.ff }
 
                 // Auto-start Break Card
                 Rectangle {
                   width: parent.width
-                  height: Style.space(54)
-                  radius: Style.cornerRadius * 1.2
-                  color: (root.svc && root.svc.autoStartBreak) ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.10) : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
+                  height: Style.space(64)
+                  radius: Style.cornerRadius
+                  color: (root.svc && root.svc.autoStartBreak) ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12) : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
                   border.width: 1
-                  border.color: (root.svc && root.svc.autoStartBreak) ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25) : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
+                  border.color: (root.svc && root.svc.autoStartBreak) ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3) : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
+                  
+                  // Smooth background transition
                   Behavior on color { ColorAnimation { duration: 200 } }
-
+                  
                   Row {
                     anchors.fill: parent
                     anchors.leftMargin: Style.space(14)
                     anchors.rightMargin: Style.space(14)
-                    spacing: Style.space(12)
-
+                    spacing: Style.space(14)
+                    
                     Text {
                       anchors.verticalCenter: parent.verticalCenter
                       text: "󰅶"
                       color: (root.svc && root.svc.autoStartBreak) ? Color.accent : Qt.darker(root.fg, 1.4)
                       font.family: root.ff
-                      font.pixelSize: 20
+                      font.pixelSize: 24
                     }
-
+                    
                     Text {
                       anchors.verticalCenter: parent.verticalCenter
-                      width: parent.width - Style.space(84)
+                      width: parent.width - Style.space(90)
                       text: "Auto-start break"
                       color: root.fg
                       font.family: root.ff
                       font.pixelSize: Style.font.body
+                      font.bold: true
                     }
-
-                    // Animated toggle switch
+                    
+                    // Custom animated switch
                     Rectangle {
                       anchors.verticalCenter: parent.verticalCenter
-                      width: Style.space(40)
-                      height: Style.space(22)
+                      width: Style.space(42)
+                      height: Style.space(24)
                       radius: height / 2
-                      color: (root.svc && root.svc.autoStartBreak) ? Color.accent : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.15)
+                      color: (root.svc && root.svc.autoStartBreak) ? Color.accent : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.2)
                       Behavior on color { ColorAnimation { duration: 200 } }
-
+                      
                       Rectangle {
-                        width: Style.space(18)
-                        height: Style.space(18)
+                        width: Style.space(20)
+                        height: Style.space(20)
                         radius: width / 2
                         color: "#ffffff"
                         y: Style.space(2)
                         x: (root.svc && root.svc.autoStartBreak) ? parent.width - width - Style.space(2) : Style.space(2)
+                        
+                        // Drop shadow effect
                         border.width: 1
-                        border.color: Qt.rgba(0,0,0,0.08)
+                        border.color: Qt.rgba(0,0,0,0.1)
+                        
                         Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
                       }
                     }
                   }
-
+                  
                   MouseArea {
                     anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
                     onClicked: if (root.svc) root.svc.autoStartBreak = !root.svc.autoStartBreak
                   }
                 }
@@ -976,62 +1013,67 @@ Panel {
                 // Auto-start Focus Card
                 Rectangle {
                   width: parent.width
-                  height: Style.space(54)
-                  radius: Style.cornerRadius * 1.2
-                  color: (root.svc && root.svc.autoStartFocus) ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.10) : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
+                  height: Style.space(64)
+                  radius: Style.cornerRadius
+                  color: (root.svc && root.svc.autoStartFocus) ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12) : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
                   border.width: 1
-                  border.color: (root.svc && root.svc.autoStartFocus) ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25) : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
+                  border.color: (root.svc && root.svc.autoStartFocus) ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3) : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
+                  
+                  // Smooth background transition
                   Behavior on color { ColorAnimation { duration: 200 } }
-
+                  
                   Row {
                     anchors.fill: parent
                     anchors.leftMargin: Style.space(14)
                     anchors.rightMargin: Style.space(14)
-                    spacing: Style.space(12)
-
+                    spacing: Style.space(14)
+                    
                     Text {
                       anchors.verticalCenter: parent.verticalCenter
                       text: "󱎫"
                       color: (root.svc && root.svc.autoStartFocus) ? Color.accent : Qt.darker(root.fg, 1.4)
                       font.family: root.ff
-                      font.pixelSize: 20
+                      font.pixelSize: 24
                     }
-
+                    
                     Text {
                       anchors.verticalCenter: parent.verticalCenter
-                      width: parent.width - Style.space(84)
+                      width: parent.width - Style.space(90)
                       text: "Auto-start focus"
                       color: root.fg
                       font.family: root.ff
                       font.pixelSize: Style.font.body
+                      font.bold: true
                     }
-
-                    // Animated toggle switch
+                    
+                    // Custom animated switch
                     Rectangle {
                       anchors.verticalCenter: parent.verticalCenter
-                      width: Style.space(40)
-                      height: Style.space(22)
+                      width: Style.space(42)
+                      height: Style.space(24)
                       radius: height / 2
-                      color: (root.svc && root.svc.autoStartFocus) ? Color.accent : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.15)
+                      color: (root.svc && root.svc.autoStartFocus) ? Color.accent : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.2)
                       Behavior on color { ColorAnimation { duration: 200 } }
-
+                      
                       Rectangle {
-                        width: Style.space(18)
-                        height: Style.space(18)
+                        width: Style.space(20)
+                        height: Style.space(20)
                         radius: width / 2
                         color: "#ffffff"
                         y: Style.space(2)
                         x: (root.svc && root.svc.autoStartFocus) ? parent.width - width - Style.space(2) : Style.space(2)
+                        
+                        // Drop shadow effect
                         border.width: 1
-                        border.color: Qt.rgba(0,0,0,0.08)
+                        border.color: Qt.rgba(0,0,0,0.1)
+                        
                         Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutBack } }
                       }
                     }
                   }
-
+                  
                   MouseArea {
                     anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
                     onClicked: if (root.svc) root.svc.autoStartFocus = !root.svc.autoStartFocus
                   }
                 }
@@ -1041,17 +1083,17 @@ Panel {
             // Notification Mode Section Card
             Rectangle {
               width: parent.width
-              height: notifSettingsCol.implicitHeight + Style.space(28)
-              radius: Style.cornerRadius * 1.5
+              height: notifSettingsCol.implicitHeight + Style.space(24)
+              radius: Style.cornerRadius
               color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
               border.width: 1
-              border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
+              border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
 
               Column {
                 id: notifSettingsCol
                 anchors.fill: parent
-                anchors.margins: Style.space(14)
-                spacing: Style.space(12)
+                anchors.margins: Style.space(12)
+                spacing: Style.space(10)
 
                 PanelSectionHeader { text: "󰂚 Completion Reminders"; foreground: root.fg; fontFamily: root.ff }
 
@@ -1061,7 +1103,7 @@ Panel {
 
                   Button {
                     width: (parent.width - Style.space(8)) / 2
-                    text: "󰂚 Notification"
+                    text: "󰂚 System Notification"
                     selected: root.svc ? root.svc.reminderMode === "notification" : true
                     fontFamily: root.ff; foreground: root.fg; accent: Color.accent
                     onClicked: if (root.svc) root.svc.reminderMode = "notification"
@@ -1069,7 +1111,7 @@ Panel {
 
                   Button {
                     width: (parent.width - Style.space(8)) / 2
-                    text: "󰍹 Overlay"
+                    text: "󰍹 Fullscreen Overlay"
                     selected: root.svc ? root.svc.reminderMode === "overlay" : false
                     fontFamily: root.ff; foreground: root.fg; accent: Color.accent
                     onClicked: if (root.svc) root.svc.reminderMode = "overlay"
