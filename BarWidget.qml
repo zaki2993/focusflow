@@ -41,9 +41,13 @@ BarWidget {
       if (svc.running) state += " · " + Model.formatRemaining(svc.remaining)
       else state += " · Paused"
       lines.push(state)
-      if (svc.activeTask) lines.push("Active Task: " + svc.activeTask.title)
+      if (svc.activeTask) {
+        var prioTag = svc.activeTask.priority ? ("[" + Model.priorityLabel(svc.activeTask.priority) + "] ") : ""
+        lines.push("Active Task: " + prioTag + svc.activeTask.title)
+      }
     }
-    lines.push("Today: " + svc.countToday + " sessions completed · " + svc.openCount + " open tasks")
+    var focusTimeText = svc.totalFocusMinutesToday > 0 ? (" · " + Model.formatMinutes(svc.totalFocusMinutesToday) + " focused") : ""
+    lines.push("Today: " + svc.countToday + " sessions" + focusTimeText + " · " + svc.openCount + " open tasks")
     return lines.join("\n")
   }
 
@@ -86,6 +90,12 @@ BarWidget {
     function open(): void   { root.open() }
     function close(): void  { root.close() }
     function toggle(): void { root.togglePanel() }
+    function setTab(tab: string): void {
+      if (panelLoader.item) {
+        var n = parseInt(tab, 10)
+        if (!isNaN(n)) panelLoader.item.activeTab = n
+      }
+    }
   }
 
   WidgetButton {

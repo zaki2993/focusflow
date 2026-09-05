@@ -11,7 +11,7 @@ Item {
   id: root
 
   property var shell: null
-  property string omarchyPath: ""
+  property string omarchyPath: Quickshell.env("OMARCHY_PATH") || "/usr/share/omarchy"
   property var manifest: null
 
   readonly property string home: Quickshell.env("HOME")
@@ -23,9 +23,13 @@ Item {
   property bool autoStartBreak: true
   property bool autoStartFocus: false
   property string reminderMode: "notification"
+  property bool soundAlert: true
+  property bool taskSoundAlert: true
+  property int dailyGoal: 4
 
   // ── Pomodoro stats ─────────────────────────────────────────────────────────
   property var sessions: []
+  readonly property int totalFocusMinutesToday: countToday * focusMinutes
 
   // ── Pomodoro runtime ───────────────────────────────────────────────────────
   property string phase: "idle"   // "idle" | "focus" | "break"
@@ -70,26 +74,90 @@ Item {
   }
 
   // ── Task operations ────────────────────────────────────────────────────────
-  function addTask(title) {
-    var value = String(title || "").trim()
-    if (!value) return false
+  function addTask(title, priority) {
+    var parsed = Model.parseTaskInput(title)
+    var val = parsed.title || String(title || "").trim()
+    if (!val) return false
+    var prio = priority ? Model.validPriority(priority) : (parsed.priority || "medium")
     var next = tasks.slice()
-    next.unshift({ id: String(Date.now()) + Math.random(), title: value, done: false, pomos: 0 })
+    next.unshift({
+      id: String(Date.now()) + Math.random(),
+      title: val,
+      done: false,
+      pomos: 0,
+      priority: prio
+    })
     tasks = next
     scheduleSave()
     return true
   }
 
-  function toggleTask(id) {
+  function setTaskPriority(id, priority) {
+    var prio = Model.validPriority(priority)
     var next = tasks.slice()
     for (var i = 0; i < next.length; i++) {
       if (String(next[i].id) === String(id)) {
-        next[i] = { id: next[i].id, title: next[i].title, done: !next[i].done, pomos: next[i].pomos || 0 }
+        next[i] = {
+          id: next[i].id,
+          title: next[i].title,
+          done: next[i].done,
+          pomos: next[i].pomos || 0,
+          priority: prio
+        }
         break
       }
     }
     tasks = next
     scheduleSave()
+  }
+
+  function cycleTaskPriority(id) {
+    var next = tasks.slice()
+    for (var i = 0; i < next.length; i++) {
+      if (String(next[i].id) === String(id)) {
+        var currentPrio = Model.validPriority(next[i].priority)
+        var nextPrio = Model.nextPriority(currentPrio)
+        next[i] = {
+          id: next[i].id,
+          title: next[i].title,
+          done: next[i].done,
+          pomos: next[i].pomos || 0,
+          priority: nextPrio
+        }
+        break
+      }
+    }
+    tasks = next
+    scheduleSave()
+  }
+
+  function toggleTask(id) {
+    var next = tasks.slice()
+    var nowDone = false
+    for (var i = 0; i < next.length; i++) {
+      if (String(next[i].id) === String(id)) {
+        nowDone = !next[i].done
+        next[i] = {
+          id: next[i].id,
+          title: next[i].title,
+          done: nowDone,
+          pomos: next[i].pomos || 0,
+          priority: Model.validPriority(next[i].priority)
+        }
+        break
+      }
+    }
+    tasks = next
+    scheduleSave()
+    if (nowDone) {
+      playTaskDoneSound()
+    }
+  }
+
+  function playTaskDoneSound() {
+    if (!taskSoundAlert) return
+    var soundPath = home + "/.config/omarchy/plugins/zakarch.focusflow/sounds/task_done.wav"
+    Quickshell.execDetached(["bash", "-c", "canberra-gtk-play -f " + soundPath + " 2>/dev/null || pw-play " + soundPath + " 2>/dev/null || paplay " + soundPath + " 2>/dev/null"])
   }
 
   function removeTask(id) {
@@ -108,12 +176,42 @@ Item {
     scheduleSave()
   }
 
+  function editTask(id, newTitle, newPriority) {
+    var val = String(newTitle || "").trim()
+    if (!val) return false
+    var next = tasks.slice()
+    for (var i = 0; i < next.length; i++) {
+      if (String(next[i].id) === String(id)) {
+        var prio = (newPriority !== undefined && newPriority !== null)
+          ? Model.validPriority(newPriority)
+          : Model.validPriority(next[i].priority)
+        next[i] = {
+          id: next[i].id,
+          title: val,
+          done: next[i].done,
+          pomos: next[i].pomos || 0,
+          priority: prio
+        }
+        break
+      }
+    }
+    tasks = next
+    scheduleSave()
+    return true
+  }
+
   function _bumpActiveTaskPomos() {
     if (!activeTaskId) return
     var next = tasks.slice()
     for (var i = 0; i < next.length; i++) {
       if (String(next[i].id) === String(activeTaskId)) {
-        next[i] = { id: next[i].id, title: next[i].title, done: next[i].done, pomos: (next[i].pomos || 0) + 1 }
+        next[i] = {
+          id: next[i].id,
+          title: next[i].title,
+          done: next[i].done,
+          pomos: (next[i].pomos || 0) + 1,
+          priority: Model.validPriority(next[i].priority)
+        }
         break
       }
     }
@@ -165,6 +263,30 @@ Item {
     lastCompleted = ""
   }
 
+  function skipToNext() {
+    if (phase === "focus") {
+      complete()
+    } else if (phase === "break") {
+      startFocus()
+    } else {
+      startFocus()
+    }
+  }
+
+  function nudgeMinutes(deltaMinutes) {
+    var deltaMs = deltaMinutes * 60 * 1000
+    if (running) {
+      endAt += deltaMs
+      totalMs = Math.max(60000, totalMs + deltaMs)
+      if (endAt <= _now) complete()
+    } else if (phase !== "idle") {
+      remainingMs = Math.max(60000, remainingMs + deltaMs)
+      totalMs = Math.max(60000, totalMs + deltaMs)
+    } else {
+      focusMinutes = Model.clampInt(focusMinutes + deltaMinutes, 25, 1, 1440)
+    }
+  }
+
   function complete() {
     var completedPhase = phase
     running = false
@@ -199,17 +321,21 @@ Item {
   property string overlayGlyph: "󰔛"
 
   function remind(title, body, glyph) {
+    if (soundAlert) {
+      Quickshell.execDetached(["canberra-gtk-play", "-i", "complete"])
+    }
     if (reminderMode === "overlay") {
       overlayTitle = title
       overlayBody = body
       overlayGlyph = glyph
       overlayVisible = true
     } else {
-      Quickshell.execDetached([omarchyPath + "/bin/omarchy-notification-send", title, body, "-g", glyph])
+      var notifBin = (omarchyPath ? (omarchyPath + "/bin/omarchy-notification-send") : "omarchy-notification-send")
+      Quickshell.execDetached([notifBin, title, body, "-g", glyph])
     }
   }
 
-  // ── Persistence ────────────────────────────────────────────────────────────
+  // ── Persistence ────────────────────────────────────────────────────
   FileView {
     id: stateFile
     path: root.statePath
@@ -243,6 +369,9 @@ Item {
     autoStartBreak = data.autoStartBreak === undefined ? true : data.autoStartBreak === true
     autoStartFocus = data.autoStartFocus === true
     reminderMode   = Model.validReminderMode(data.reminderMode)
+    soundAlert     = data.soundAlert === undefined ? true : data.soundAlert === true
+    taskSoundAlert = data.taskSoundAlert === undefined ? true : data.taskSoundAlert === true
+    dailyGoal      = Model.clampInt(data.dailyGoal, 4, 1, 30)
     sessions       = Model.validSessions(data.sessions)
 
     // Tasks
@@ -255,7 +384,8 @@ Item {
             id: String(t.id || Date.now() + i),
             title: String(t.title).trim(),
             done: t.done === true,
-            pomos: parseInt(t.pomos, 10) || 0
+            pomos: parseInt(t.pomos, 10) || 0,
+            priority: Model.validPriority(t.priority)
           })
       }
     }
@@ -272,6 +402,9 @@ Item {
       autoStartBreak: autoStartBreak,
       autoStartFocus: autoStartFocus,
       reminderMode: reminderMode,
+      soundAlert: soundAlert,
+      taskSoundAlert: taskSoundAlert,
+      dailyGoal: dailyGoal,
       sessions: sessions,
       tasks: tasks,
       activeTaskId: activeTaskId
@@ -283,6 +416,9 @@ Item {
   onAutoStartBreakChanged: scheduleSave()
   onAutoStartFocusChanged: scheduleSave()
   onReminderModeChanged:   scheduleSave()
+  onSoundAlertChanged:     scheduleSave()
+  onTaskSoundAlertChanged: scheduleSave()
+  onDailyGoalChanged:      scheduleSave()
   onActiveTaskIdChanged:   scheduleSave()
 
   Process {
@@ -317,8 +453,28 @@ Item {
     function pause(): string        { root.pause();        return "ok" }
     function resume(): string       { root.resume();       return "ok" }
     function reset(): string        { root.reset();        return "ok" }
+    function skip(): string         { root.skipToNext();   return "ok" }
+    function nudge(mins: string): string {
+      var n = parseInt(mins, 10) || 0
+      if (n !== 0) root.nudgeMinutes(n)
+      return "ok"
+    }
     function addTask(title: string): string {
       return root.addTask(title) ? "ok" : "err:empty"
+    }
+    function addTaskWithPriority(title: string, priority: string): string {
+      return root.addTask(title, priority) ? "ok" : "err:empty"
+    }
+    function setPriority(id: string, priority: string): string {
+      root.setTaskPriority(id, priority)
+      return "ok"
+    }
+    function cyclePriority(id: string): string {
+      root.cycleTaskPriority(id)
+      return "ok"
+    }
+    function editTask(id: string, title: string): string {
+      return root.editTask(id, title) ? "ok" : "err"
     }
     function removeTask(id: string): string { root.removeTask(id); return "ok" }
     function toggleTask(id: string): string { root.toggleTask(id); return "ok" }
@@ -335,6 +491,8 @@ Item {
         autoStartBreak: root.autoStartBreak,
         autoStartFocus: root.autoStartFocus,
         reminderMode: root.reminderMode,
+        soundAlert: root.soundAlert,
+        dailyGoal: root.dailyGoal,
         today: root.countToday,
         week: root.countWeek,
         month: root.countMonth,

@@ -6,7 +6,6 @@ import qs.Ui
 import "Model.js" as Model
 
 // Focus Flow Panel UI — Redesigned 3-Tab Interface: Focus, Tasks, Settings.
-// Unified pomodoro timer + task manager with native Omarchy styling.
 Panel {
   id: root
   moduleName: "zakarch.focusflow"
@@ -20,7 +19,6 @@ Panel {
   readonly property var svc: bar && bar.shell ? bar.shell.serviceFor("zakarch.focusflow") : null
 
   readonly property color fg: bar ? bar.foreground : Color.foreground
-  readonly property color bg: bar ? bar.background : Color.background
   readonly property string ff: bar ? bar.fontFamily : Style.font.family
 
   // ── Phase-aware accent colors ───────────────────────────────────────────────
@@ -56,12 +54,6 @@ Panel {
     }
     return filtered
   }
-
-  // ── Task Goal Computations (tasks set by user) ──────────────────────────────
-  readonly property var taskStats: Model.taskStats(svc ? svc.tasks : [])
-  readonly property int tasksTotal: taskStats.total
-  readonly property int tasksDone: taskStats.done
-  readonly property int taskGoalPercent: taskStats.percent
 
   // ── Pomodoro computations ──────────────────────────────────────────────────
   readonly property string heroTime: svc
@@ -104,7 +96,7 @@ Panel {
     open: root.opened
     centerOnBar: true
     focusTarget: keyCatcher
-    contentWidth: panel.fittedContentWidth(Style.space(450))
+    contentWidth: panel.fittedContentWidth(Style.space(430))
     contentHeight: panel.fittedContentHeight(mainCol.implicitHeight)
 
     PanelKeyCatcher {
@@ -135,9 +127,9 @@ Panel {
         // ════════════ SEGMENTED TAB BAR ═════════════════════════════════════
         Item {
           width: parent.width
-          height: Style.space(38)
+          height: Style.space(42)
 
-          // Capsule background
+          // Background pill
           Rectangle {
             anchors.fill: parent
             radius: height / 2
@@ -167,7 +159,7 @@ Panel {
 
             // Tab 0: Focus
             Item {
-              width: parent.width / 3
+              width: (parent.width) / 3
               height: parent.height
 
               Row {
@@ -218,7 +210,7 @@ Panel {
 
             // Tab 1: Tasks
             Item {
-              width: parent.width / 3
+              width: (parent.width) / 3
               height: parent.height
 
               Row {
@@ -276,7 +268,7 @@ Panel {
 
             // Tab 2: Settings
             Item {
-              width: parent.width / 3
+              width: (parent.width) / 3
               height: parent.height
 
               Row {
@@ -334,10 +326,10 @@ Panel {
             Rectangle {
               width: parent.width
               height: Style.space(56)
-              radius: Style.cornerRadius
+              radius: Style.cornerRadius * 1.3
               color: root.svc && root.svc.activeTask
-                ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.08)
-                : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.035)
+                ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.09)
+                : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
               border.width: 1
               border.color: root.svc && root.svc.activeTask
                 ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.28)
@@ -354,12 +346,12 @@ Panel {
                 // Quick complete checkbox button
                 Rectangle {
                   anchors.verticalCenter: parent.verticalCenter
-                  width: Style.space(24); height: width
-                  radius: Style.space(6)
+                  width: Style.space(26); height: width
+                  radius: Style.cornerRadius * 0.7
                   color: (root.svc && root.svc.activeTask && root.svc.activeTask.done)
                     ? Color.accent
                     : (root.svc && root.svc.activeTask)
-                      ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.16)
+                      ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18)
                       : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.06)
                   border.width: 1.5
                   border.color: (root.svc && root.svc.activeTask) ? Color.accent : Qt.darker(root.fg, 1.4)
@@ -369,7 +361,7 @@ Panel {
                     text: (root.svc && root.svc.activeTask && root.svc.activeTask.done) ? "✓" : (root.svc && root.svc.activeTask ? "󰌵" : "󰏫")
                     color: (root.svc && root.svc.activeTask && root.svc.activeTask.done) ? Color.background : ((root.svc && root.svc.activeTask) ? Color.accent : Qt.darker(root.fg, 1.4))
                     font.family: root.ff
-                    font.pixelSize: 12
+                    font.pixelSize: 13
                   }
 
                   MouseArea {
@@ -387,7 +379,7 @@ Panel {
 
                 // Task title and metadata
                 Column {
-                  width: parent.width - Style.space(125)
+                  width: parent.width - Style.space(136)
                   anchors.verticalCenter: parent.verticalCenter
                   spacing: 2
 
@@ -406,7 +398,7 @@ Panel {
                       color: {
                         var p = (root.svc && root.svc.activeTask) ? (root.svc.activeTask.priority || "medium") : "medium"
                         if (p === "high") return Qt.rgba(0.937, 0.267, 0.267, 0.18)
-                        if (p === "low")  return Qt.rgba(0.231, 0.510, 0.965, 0.18)
+                        if (p === "low") return Qt.rgba(0.231, 0.510, 0.965, 0.18)
                         return Qt.rgba(0.961, 0.620, 0.043, 0.18)
                       }
                       border.width: 1
@@ -446,7 +438,7 @@ Panel {
 
                   Text {
                     text: root.svc && root.svc.activeTask
-                      ? "󰔛 " + (root.svc.activeTask.pomos || 0) + " pomos completed · " + (root.svc.activeTask.done ? "Completed ✓" : "In progress")
+                      ? "󰔛 " + (root.svc.activeTask.pomos || 0) + " pomos · " + (root.svc.activeTask.done ? "Done ✓" : "Click checkbox to finish")
                       : (root.svc && root.svc.openCount > 0 ? "Select from " + root.svc.openCount + " open tasks" : "Create tasks in the Tasks tab")
                     color: Qt.darker(root.fg, 1.5)
                     font.family: root.ff
@@ -472,33 +464,27 @@ Panel {
             // ── Circular Timer Instrument ───────────────────────────────────
             Item {
               width: parent.width
-              height: Style.space(220)
+              height: Style.space(225)
 
-              // Soft ambient pulsating aura when running
+              // Soft ambient glow ring
               Rectangle {
                 anchors.centerIn: parent
-                width: Style.space(190)
+                width: Style.space(196)
                 height: width
                 radius: width / 2
-                color: Qt.rgba(root.phaseColor.r, root.phaseColor.g, root.phaseColor.b, 0.04)
+                color: "transparent"
                 border.width: 1.5
-                border.color: Qt.rgba(root.phaseColor.r, root.phaseColor.g, root.phaseColor.b, 0.22)
-                visible: root.svc && root.svc.running
-
-                SequentialAnimation on opacity {
-                  loops: Animation.Infinite
-                  running: root.svc && root.svc.running
-                  NumberAnimation { from: 0.35; to: 1.0; duration: 1200; easing.type: Easing.InOutQuad }
-                  NumberAnimation { from: 1.0; to: 0.35; duration: 1200; easing.type: Easing.InOutQuad }
-                }
+                border.color: root.phaseColor
+                opacity: (root.svc && root.svc.running) ? 0.22 : 0
+                Behavior on opacity { NumberAnimation { duration: 350 } }
               }
 
               // High-precision canvas ring
               Canvas {
                 id: timerRing
                 anchors.centerIn: parent
-                width: Style.space(182)
-                height: Style.space(182)
+                width: Style.space(184)
+                height: Style.space(184)
 
                 readonly property real prog: root.progress
                 readonly property color ringColor: root.phaseColor
@@ -513,7 +499,7 @@ Panel {
                   ctx.clearRect(0, 0, width, height)
                   var cx = width / 2
                   var cy = height / 2
-                  var r = Math.min(width, height) / 2 - 8
+                  var r = Math.min(width, height) / 2 - 9
                   var lineWidth = 7
 
                   // Track ring
@@ -548,9 +534,9 @@ Panel {
                   width: phaseRow.implicitWidth + Style.space(16)
                   height: Style.space(22)
                   radius: height / 2
-                  color: Qt.rgba(root.phaseColor.r, root.phaseColor.g, root.phaseColor.b, 0.14)
+                  color: Qt.rgba(root.phaseColor.r, root.phaseColor.g, root.phaseColor.b, 0.12)
                   border.width: 1
-                  border.color: Qt.rgba(root.phaseColor.r, root.phaseColor.g, root.phaseColor.b, 0.32)
+                  border.color: Qt.rgba(root.phaseColor.r, root.phaseColor.g, root.phaseColor.b, 0.30)
 
                   Row {
                     id: phaseRow
@@ -574,13 +560,13 @@ Panel {
                   }
                 }
 
-                // Monospace Clock Digits
+                // Big Clock Digits
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   text: root.heroTime
                   color: root.fg
                   font.family: root.ff
-                  font.pixelSize: Style.space(42)
+                  font.pixelSize: 46
                   font.bold: true
                   font.letterSpacing: 1.5
                 }
@@ -602,22 +588,37 @@ Panel {
                 spacing: Style.space(6)
                 visible: root.svc && root.svc.phase !== "idle"
 
-                Repeater {
-                  model: [
-                    { label: "−5m", delta: -5 },
-                    { label: "−1m", delta: -1 },
-                    { label: "+1m", delta: 1 },
-                    { label: "+5m", delta: 5 }
-                  ]
-                  delegate: Button {
-                    required property var modelData
-                    text: modelData.label
-                    foreground: Qt.darker(root.fg, 1.25)
-                    accent: Color.accent
-                    fontFamily: root.ff
-                    fontSize: Style.font.caption
-                    onClicked: if (root.svc) root.svc.nudgeMinutes(modelData.delta)
-                  }
+                Button {
+                  text: "−5m"
+                  foreground: Qt.darker(root.fg, 1.3)
+                  accent: Color.accent
+                  fontFamily: root.ff
+                  fontSize: Style.font.caption
+                  onClicked: if (root.svc) root.svc.nudgeMinutes(-5)
+                }
+                Button {
+                  text: "−1m"
+                  foreground: Qt.darker(root.fg, 1.3)
+                  accent: Color.accent
+                  fontFamily: root.ff
+                  fontSize: Style.font.caption
+                  onClicked: if (root.svc) root.svc.nudgeMinutes(-1)
+                }
+                Button {
+                  text: "+1m"
+                  foreground: Qt.darker(root.fg, 1.3)
+                  accent: Color.accent
+                  fontFamily: root.ff
+                  fontSize: Style.font.caption
+                  onClicked: if (root.svc) root.svc.nudgeMinutes(1)
+                }
+                Button {
+                  text: "+5m"
+                  foreground: Qt.darker(root.fg, 1.3)
+                  accent: Color.accent
+                  fontFamily: root.ff
+                  fontSize: Style.font.caption
+                  onClicked: if (root.svc) root.svc.nudgeMinutes(5)
                 }
               }
 
@@ -651,7 +652,7 @@ Panel {
 
               Button {
                 id: primaryBtn
-                width: Math.round((parent.width - Style.space(16)) * 0.50)
+                width: (parent.width - Style.space(16)) * 0.52
                 text: root.primaryLabel
                 fontFamily: root.ff
                 foreground: (root.svc && root.svc.running) ? root.fg : Color.background
@@ -661,8 +662,7 @@ Panel {
               }
 
               Button {
-                id: breakBtn
-                width: Math.round((parent.width - Style.space(16)) * 0.30)
+                width: (parent.width - Style.space(16)) * 0.28
                 text: !root.svc ? "󰅶 Break"
                   : root.svc.phase === "focus" ? "󰅶 Take Break"
                   : root.svc.phase === "break" ? "󱎫 Skip Focus"
@@ -678,7 +678,7 @@ Panel {
               }
 
               Button {
-                width: parent.width - primaryBtn.width - breakBtn.width - Style.space(16)
+                width: (parent.width - Style.space(16)) * 0.20
                 text: "󰜉 Reset"
                 fontFamily: root.ff
                 foreground: Qt.darker(root.fg, 1.3)
@@ -691,8 +691,8 @@ Panel {
             Rectangle {
               width: parent.width
               height: statsCol.implicitHeight + Style.space(22)
-              radius: Style.cornerRadius
-              color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.035)
+              radius: Style.cornerRadius * 1.3
+              color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
               border.width: 1
               border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.07)
 
@@ -735,94 +735,20 @@ Panel {
                     color: Qt.darker(root.fg, 1.4)
                     font.family: root.ff
                     font.pixelSize: Style.font.caption
-                    font.bold: true
                     anchors.verticalCenter: parent.verticalCenter
                   }
                 }
 
-                // Daily Goal Progress bar (Tracked by Tasks Set)
-                Column {
-                  width: parent.width
-                  spacing: Style.space(4)
-
-                  Row {
-                    width: parent.width
-                    Text {
-                      width: parent.width * 0.55
-                      text: root.tasksTotal > 0
-                        ? ("Daily Tasks Goal (" + root.tasksDone + " / " + root.tasksTotal + " completed)")
-                        : "Daily Tasks Goal (0 tasks)"
-                      color: Qt.darker(root.fg, 1.5)
-                      font.family: root.ff
-                      font.pixelSize: Style.font.caption
-                    }
-                    Text {
-                      width: parent.width * 0.45
-                      horizontalAlignment: Text.AlignRight
-                      text: root.tasksTotal > 0
-                        ? (root.tasksDone + " of " + root.tasksTotal + " (" + root.taskGoalPercent + "%)")
-                        : "No tasks set yet"
-                      color: (root.taskGoalPercent === 100 && root.tasksTotal > 0) ? "#10b981" : Color.accent
-                      font.family: root.ff
-                      font.pixelSize: Style.font.caption
-                      font.bold: true
-                    }
-                  }
-
-                  Rectangle {
-                    width: parent.width
-                    height: Style.space(6)
-                    radius: height / 2
-                    color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
-
-                    Rectangle {
-                      height: parent.height
-                      radius: height / 2
-                      width: Math.min(parent.width, parent.width * (root.taskGoalPercent / 100))
-                      color: (root.taskGoalPercent === 100 && root.tasksTotal > 0) ? "#10b981" : Color.accent
-                      Behavior on width { NumberAnimation { duration: 300; easing.type: Easing.OutQuad } }
-                    }
-                  }
-                }
-
-                // Metrics row: Tasks, Today, Week
+                // Metrics row: Today, Week, Month
                 Row {
                   width: parent.width
                   spacing: Style.space(6)
 
                   Rectangle {
                     width: (parent.width - Style.space(12)) / 3
-                    height: Style.space(34)
+                    height: Style.space(36)
                     radius: Style.cornerRadius
                     color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
-                    border.width: 1
-                    border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.05)
-                    Row {
-                      anchors.centerIn: parent
-                      spacing: Style.space(4)
-                      Text {
-                        text: "󰄲"
-                        color: (root.taskGoalPercent === 100 && root.tasksTotal > 0) ? "#10b981" : Color.accent
-                        font.family: root.ff
-                        font.pixelSize: Style.font.caption
-                      }
-                      Text {
-                        text: "Tasks: " + root.tasksDone + "/" + root.tasksTotal
-                        color: root.fg
-                        font.family: root.ff
-                        font.pixelSize: Style.font.caption
-                        font.bold: true
-                      }
-                    }
-                  }
-
-                  Rectangle {
-                    width: (parent.width - Style.space(12)) / 3
-                    height: Style.space(34)
-                    radius: Style.cornerRadius
-                    color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
-                    border.width: 1
-                    border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.05)
                     Row {
                       anchors.centerIn: parent
                       spacing: Style.space(4)
@@ -833,16 +759,27 @@ Panel {
 
                   Rectangle {
                     width: (parent.width - Style.space(12)) / 3
-                    height: Style.space(34)
+                    height: Style.space(36)
                     radius: Style.cornerRadius
                     color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
-                    border.width: 1
-                    border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.05)
                     Row {
                       anchors.centerIn: parent
                       spacing: Style.space(4)
                       Text { text: "󰨲"; color: Qt.darker(root.fg, 1.5); font.family: root.ff; font.pixelSize: Style.font.caption }
                       Text { text: "Week: " + (root.svc ? root.svc.countWeek : 0); color: root.fg; font.family: root.ff; font.pixelSize: Style.font.caption; font.bold: true }
+                    }
+                  }
+
+                  Rectangle {
+                    width: (parent.width - Style.space(12)) / 3
+                    height: Style.space(36)
+                    radius: Style.cornerRadius
+                    color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
+                    Row {
+                      anchors.centerIn: parent
+                      spacing: Style.space(4)
+                      Text { text: "󰸗"; color: Qt.darker(root.fg, 1.5); font.family: root.ff; font.pixelSize: Style.font.caption }
+                      Text { text: "Month: " + (root.svc ? root.svc.countMonth : 0); color: root.fg; font.family: root.ff; font.pixelSize: Style.font.caption; font.bold: true }
                     }
                   }
                 }
@@ -867,7 +804,7 @@ Panel {
                 width: parent.width - headerActions.width - Style.space(10)
                 spacing: 1
                 Text {
-                  text: "Tasks"
+                  text: "Task Management"
                   color: root.fg; font.family: root.ff
                   font.pixelSize: Style.font.heading; font.bold: true
                 }
@@ -938,12 +875,12 @@ Panel {
             Rectangle {
               width: parent.width
               height: Style.space(78)
-              radius: Style.cornerRadius
-              color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
+              radius: Style.cornerRadius * 1.2
+              color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.05)
               border.width: 1
               border.color: taskInput.activeFocus
                 ? Color.accent
-                : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.10)
+                : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.12)
               Behavior on border.color { ColorAnimation { duration: 180 } }
 
               Column {
@@ -954,13 +891,12 @@ Panel {
                 spacing: Style.space(6)
 
                 // Top: Input & Add Button
-                Item {
+                Row {
                   width: parent.width
                   height: Style.space(30)
+                  spacing: Style.space(8)
 
                   Text {
-                    id: inputIcon
-                    anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     text: "󰐕"
                     color: taskInput.activeFocus ? Color.accent : Qt.darker(root.fg, 1.5)
@@ -968,30 +904,10 @@ Panel {
                     font.pixelSize: Style.font.body
                   }
 
-                  Button {
-                    id: addBtn
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Add"
-                    foreground: root.fg
-                    accent: Color.accent
-                    fontFamily: root.ff
-                    fontSize: Style.font.caption
-                    onClicked: {
-                      if (root.svc && root.svc.addTask(taskInput.text, root.newTaskPriority)) {
-                        taskInput.text = ""
-                        root.newTaskPriority = "medium"
-                      }
-                    }
-                  }
-
                   TextInput {
                     id: taskInput
-                    anchors.left: inputIcon.right
-                    anchors.leftMargin: Style.space(8)
-                    anchors.right: addBtn.left
-                    anchors.rightMargin: Style.space(8)
                     anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - addBtn.width - Style.space(32)
                     color: root.fg
                     font.family: root.ff
                     font.pixelSize: Style.font.body
@@ -1014,165 +930,180 @@ Panel {
                       }
                     }
                   }
+
+                  Button {
+                    id: addBtn
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Add"
+                    foreground: root.fg
+                    accent: Color.accent
+                    fontFamily: root.ff
+                    fontSize: Style.font.caption
+                    onClicked: {
+                      if (root.svc && root.svc.addTask(taskInput.text, root.newTaskPriority)) {
+                        taskInput.text = ""
+                        root.newTaskPriority = "medium"
+                      }
+                    }
+                  }
                 }
 
                 // Bottom: Priority Selector Chips & Shorthand Tip
-                Item {
+                Row {
                   width: parent.width
                   height: Style.space(24)
+                  spacing: Style.space(6)
 
-                  Row {
-                    anchors.left: parent.left
+                  Text {
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: Style.space(6)
+                    text: "Priority:"
+                    color: Qt.darker(root.fg, 1.6)
+                    font.family: root.ff
+                    font.pixelSize: Style.font.caption
+                  }
 
-                    Text {
-                      anchors.verticalCenter: parent.verticalCenter
-                      text: "Priority:"
-                      color: Qt.darker(root.fg, 1.6)
-                      font.family: root.ff
-                      font.pixelSize: Style.font.caption
-                    }
+                  // High Chip
+                  Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: Style.space(22)
+                    width: highPillRow.implicitWidth + Style.space(12)
+                    radius: Style.space(11)
+                    color: root.newTaskPriority === "high"
+                      ? Qt.rgba(0.937, 0.267, 0.267, 0.22)
+                      : highMouse.containsMouse
+                        ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
+                        : "transparent"
+                    border.width: 1
+                    border.color: root.newTaskPriority === "high"
+                      ? "#ef4444"
+                      : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.15)
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
-                    // High Chip
-                    Rectangle {
-                      anchors.verticalCenter: parent.verticalCenter
-                      height: Style.space(22)
-                      width: highPillRow.implicitWidth + Style.space(12)
-                      radius: Style.space(11)
-                      color: root.newTaskPriority === "high"
-                        ? Qt.rgba(0.937, 0.267, 0.267, 0.22)
-                        : highMouse.containsMouse
-                          ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
-                          : "transparent"
-                      border.width: 1
-                      border.color: root.newTaskPriority === "high"
-                        ? "#ef4444"
-                        : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.15)
-                      Behavior on color { ColorAnimation { duration: 150 } }
-
-                      Row {
-                        id: highPillRow
-                        anchors.centerIn: parent
-                        spacing: Style.space(4)
-                        Text {
-                          text: Model.priorityIcon("high")
-                          color: "#ef4444"
-                          font.family: root.ff
-                          font.pixelSize: 10
-                        }
-                        Text {
-                          text: "High"
-                          color: root.newTaskPriority === "high" ? "#ef4444" : Qt.darker(root.fg, 1.4)
-                          font.family: root.ff
-                          font.pixelSize: Style.font.caption
-                          font.bold: root.newTaskPriority === "high"
-                        }
+                    Row {
+                      id: highPillRow
+                      anchors.centerIn: parent
+                      spacing: Style.space(4)
+                      Text {
+                        text: "󰌵"
+                        color: "#ef4444"
+                        font.family: root.ff
+                        font.pixelSize: 11
                       }
-                      MouseArea {
-                        id: highMouse
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true
-                        onClicked: root.newTaskPriority = "high"
+                      Text {
+                        text: "High"
+                        color: root.newTaskPriority === "high" ? "#ef4444" : Qt.darker(root.fg, 1.4)
+                        font.family: root.ff
+                        font.pixelSize: Style.font.caption
+                        font.bold: root.newTaskPriority === "high"
                       }
                     }
+                    MouseArea {
+                      id: highMouse
+                      anchors.fill: parent
+                      cursorShape: Qt.PointingHandCursor
+                      hoverEnabled: true
+                      onClicked: root.newTaskPriority = "high"
+                    }
+                  }
 
-                    // Medium Chip
-                    Rectangle {
-                      anchors.verticalCenter: parent.verticalCenter
-                      height: Style.space(22)
-                      width: medPillRow.implicitWidth + Style.space(12)
-                      radius: Style.space(11)
-                      color: root.newTaskPriority === "medium"
-                        ? Qt.rgba(0.961, 0.620, 0.043, 0.22)
-                        : medMouse.containsMouse
-                          ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
-                          : "transparent"
-                      border.width: 1
-                      border.color: root.newTaskPriority === "medium"
-                        ? "#f59e0b"
-                        : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.15)
-                      Behavior on color { ColorAnimation { duration: 150 } }
+                  // Medium Chip
+                  Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: Style.space(22)
+                    width: medPillRow.implicitWidth + Style.space(12)
+                    radius: Style.space(11)
+                    color: root.newTaskPriority === "medium"
+                      ? Qt.rgba(0.961, 0.620, 0.043, 0.22)
+                      : medMouse.containsMouse
+                        ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
+                        : "transparent"
+                    border.width: 1
+                    border.color: root.newTaskPriority === "medium"
+                      ? "#f59e0b"
+                      : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.15)
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
-                      Row {
-                        id: medPillRow
-                        anchors.centerIn: parent
-                        spacing: Style.space(4)
-                        Text {
-                          text: Model.priorityIcon("medium")
-                          color: "#f59e0b"
-                          font.family: root.ff
-                          font.pixelSize: 10
-                        }
-                        Text {
-                          text: "Medium"
-                          color: root.newTaskPriority === "medium" ? "#f59e0b" : Qt.darker(root.fg, 1.4)
-                          font.family: root.ff
-                          font.pixelSize: Style.font.caption
-                          font.bold: root.newTaskPriority === "medium"
-                        }
+                    Row {
+                      id: medPillRow
+                      anchors.centerIn: parent
+                      spacing: Style.space(4)
+                      Text {
+                        text: "󰚌"
+                        color: "#f59e0b"
+                        font.family: root.ff
+                        font.pixelSize: 11
                       }
-                      MouseArea {
-                        id: medMouse
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true
-                        onClicked: root.newTaskPriority = "medium"
+                      Text {
+                        text: "Medium"
+                        color: root.newTaskPriority === "medium" ? "#f59e0b" : Qt.darker(root.fg, 1.4)
+                        font.family: root.ff
+                        font.pixelSize: Style.font.caption
+                        font.bold: root.newTaskPriority === "medium"
                       }
                     }
+                    MouseArea {
+                      id: medMouse
+                      anchors.fill: parent
+                      cursorShape: Qt.PointingHandCursor
+                      hoverEnabled: true
+                      onClicked: root.newTaskPriority = "medium"
+                    }
+                  }
 
-                    // Low Chip
-                    Rectangle {
-                      anchors.verticalCenter: parent.verticalCenter
-                      height: Style.space(22)
-                      width: lowPillRow.implicitWidth + Style.space(12)
-                      radius: Style.space(11)
-                      color: root.newTaskPriority === "low"
-                        ? Qt.rgba(0.231, 0.510, 0.965, 0.22)
-                        : lowMouse.containsMouse
-                          ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
-                          : "transparent"
-                      border.width: 1
-                      border.color: root.newTaskPriority === "low"
-                        ? "#3b82f6"
-                        : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.15)
-                      Behavior on color { ColorAnimation { duration: 150 } }
+                  // Low Chip
+                  Rectangle {
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: Style.space(22)
+                    width: lowPillRow.implicitWidth + Style.space(12)
+                    radius: Style.space(11)
+                    color: root.newTaskPriority === "low"
+                      ? Qt.rgba(0.231, 0.510, 0.965, 0.22)
+                      : lowMouse.containsMouse
+                        ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
+                        : "transparent"
+                    border.width: 1
+                    border.color: root.newTaskPriority === "low"
+                      ? "#3b82f6"
+                      : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.15)
+                    Behavior on color { ColorAnimation { duration: 150 } }
 
-                      Row {
-                        id: lowPillRow
-                        anchors.centerIn: parent
-                        spacing: Style.space(4)
-                        Text {
-                          text: Model.priorityIcon("low")
-                          color: "#3b82f6"
-                          font.family: root.ff
-                          font.pixelSize: 10
-                        }
-                        Text {
-                          text: "Low"
-                          color: root.newTaskPriority === "low" ? "#3b82f6" : Qt.darker(root.fg, 1.4)
-                          font.family: root.ff
-                          font.pixelSize: Style.font.caption
-                          font.bold: root.newTaskPriority === "low"
-                        }
+                    Row {
+                      id: lowPillRow
+                      anchors.centerIn: parent
+                      spacing: Style.space(4)
+                      Text {
+                        text: "󰌑"
+                        color: "#3b82f6"
+                        font.family: root.ff
+                        font.pixelSize: 11
                       }
-                      MouseArea {
-                        id: lowMouse
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        hoverEnabled: true
-                        onClicked: root.newTaskPriority = "low"
+                      Text {
+                        text: "Low"
+                        color: root.newTaskPriority === "low" ? "#3b82f6" : Qt.darker(root.fg, 1.4)
+                        font.family: root.ff
+                        font.pixelSize: Style.font.caption
+                        font.bold: root.newTaskPriority === "low"
                       }
                     }
+                    MouseArea {
+                      id: lowMouse
+                      anchors.fill: parent
+                      cursorShape: Qt.PointingHandCursor
+                      hoverEnabled: true
+                      onClicked: root.newTaskPriority = "low"
+                    }
+                  }
+
+                  Item {
+                    width: Math.max(0, parent.width - (highPillRow.parent.width + medPillRow.parent.width + lowPillRow.parent.width + Style.space(64) + tipText.implicitWidth))
+                    height: 1
                   }
 
                   Text {
                     id: tipText
-                    anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
                     text: "!high · !med · !low"
-                    color: Qt.darker(root.fg, 1.9)
+                    color: Qt.darker(root.fg, 2.0)
                     font.family: root.ff
                     font.pixelSize: Style.font.caption * 0.85
                   }
@@ -1186,8 +1117,8 @@ Panel {
             Rectangle {
               visible: !root.svc || root.taskListModel.length === 0
               width: parent.width
-              height: Style.space(110)
-              radius: Style.cornerRadius
+              height: Style.space(120)
+              radius: Style.cornerRadius * 1.3
               color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.03)
 
               Column {
@@ -1198,7 +1129,7 @@ Panel {
                   text: root.taskFilter === "done" ? "󰄲" : "󰗡"
                   color: Qt.darker(root.fg, 1.6)
                   font.family: root.ff
-                  font.pixelSize: 34
+                  font.pixelSize: 38
                 }
                 Text {
                   anchors.horizontalCenter: parent.horizontalCenter
@@ -1242,14 +1173,14 @@ Panel {
 
                   width: taskList.width
                   height: Style.space(52)
-                  radius: Style.cornerRadius
+                  radius: Style.cornerRadius * 1.2
                   color: isActive
                     ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.12)
                     : itemMouse.containsMouse
                       ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.08)
                       : modelData.done
                         ? Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.02)
-                        : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
+                        : Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.05)
                   border.width: 1
                   border.color: isActive
                     ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.35)
@@ -1263,43 +1194,195 @@ Panel {
                     acceptedButtons: Qt.NoButton
                   }
 
-                  // Toggle Checkbox
-                  Rectangle {
-                    id: checkRect
-                    width: Style.space(22); height: width
-                    anchors.left: parent.left
-                    anchors.leftMargin: Style.space(12)
-                    anchors.verticalCenter: parent.verticalCenter
-                    radius: Style.space(6)
-                    color: modelData.done ? Color.accent : "transparent"
-                    border.width: 1.5
-                    border.color: modelData.done ? Color.accent : Qt.darker(root.fg, 1.4)
-                    Behavior on color { ColorAnimation { duration: 180 } }
-
-                    Text {
-                      anchors.centerIn: parent
-                      text: "✓"
-                      visible: modelData.done
-                      color: Color.background
-                      font.pixelSize: 11
-                      font.bold: true
-                    }
-                    MouseArea {
-                      anchors.fill: parent
-                      cursorShape: Qt.PointingHandCursor
-                      onClicked: if (root.svc) root.svc.toggleTask(modelData.id)
-                    }
-                  }
-
-                  // Action buttons on right (Focus + Delete)
                   Row {
-                    id: rowActions
-                    visible: !taskRowRect.isEditing
-                    anchors.right: parent.right
+                    anchors.fill: parent
+                    anchors.leftMargin: Style.space(12)
                     anchors.rightMargin: Style.space(8)
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Style.space(6)
+                    spacing: Style.space(10)
 
+                    // Toggle Checkbox
+                    Rectangle {
+                      width: Style.space(22); height: width
+                      anchors.verticalCenter: parent.verticalCenter
+                      radius: Style.space(6)
+                      color: modelData.done ? Color.accent : "transparent"
+                      border.width: 2
+                      border.color: modelData.done ? Color.accent : Qt.darker(root.fg, 1.4)
+                      Behavior on color { ColorAnimation { duration: 180 } }
+
+                      Text {
+                        anchors.centerIn: parent
+                        text: "✓"
+                        visible: modelData.done
+                        color: Color.background
+                        font.pixelSize: 11
+                        font.bold: true
+                      }
+                      MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: if (root.svc) root.svc.toggleTask(modelData.id)
+                      }
+                    }
+
+                    // Task Title or Inline Editor
+                    Item {
+                      width: parent.width - Style.space(160)
+                      height: parent.height
+
+                      // Normal View
+                      Column {
+                        visible: !taskRowRect.isEditing
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width
+                        spacing: 2
+
+                        Text {
+                          width: parent.width
+                          text: modelData.title
+                          color: modelData.done ? Qt.darker(root.fg, 1.7) : root.fg
+                          font.family: root.ff
+                          font.pixelSize: Style.font.body
+                          font.strikeout: modelData.done
+                          elide: Text.ElideRight
+                        }
+
+                        Row {
+                          spacing: Style.space(6)
+
+                          // Interactive Priority Badge (Click to cycle priority)
+                          Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            height: Style.space(16)
+                            width: prioBadgeRow.implicitWidth + Style.space(8)
+                            radius: Style.space(8)
+                            color: {
+                              var p = modelData.priority || "medium"
+                              if (p === "high") return Qt.rgba(0.937, 0.267, 0.267, 0.18)
+                              if (p === "low")  return Qt.rgba(0.231, 0.510, 0.965, 0.18)
+                              return Qt.rgba(0.961, 0.620, 0.043, 0.18)
+                            }
+                            border.width: 1
+                            border.color: Model.priorityColor(modelData.priority)
+
+                            Row {
+                              id: prioBadgeRow
+                              anchors.centerIn: parent
+                              spacing: Style.space(2)
+                              Text {
+                                text: Model.priorityIcon(modelData.priority)
+                                color: Model.priorityColor(modelData.priority)
+                                font.family: root.ff
+                                font.pixelSize: 9
+                              }
+                              Text {
+                                text: Model.priorityLabel(modelData.priority)
+                                color: Model.priorityColor(modelData.priority)
+                                font.family: root.ff
+                                font.pixelSize: Style.font.caption * 0.85
+                                font.bold: true
+                              }
+                            }
+
+                            MouseArea {
+                              anchors.fill: parent
+                              cursorShape: Qt.PointingHandCursor
+                              hoverEnabled: true
+                              onClicked: {
+                                if (root.svc) root.svc.cycleTaskPriority(modelData.id)
+                              }
+                            }
+                          }
+
+                          Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "· 󰔛 " + (modelData.pomos || 0) + " pomos"
+                            color: Color.accent
+                            font.family: root.ff
+                            font.pixelSize: Style.font.caption
+                          }
+                          Text {
+                            visible: taskRowRect.isActive
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "· Active Focus"
+                            color: Color.accent
+                            font.family: root.ff
+                            font.pixelSize: Style.font.caption
+                            font.bold: true
+                          }
+                        }
+                      }
+
+                      MouseArea {
+                        anchors.fill: parent
+                        visible: !taskRowRect.isEditing
+                        cursorShape: Qt.PointingHandCursor
+                        onDoubleClicked: {
+                          root.editingTaskId = String(modelData.id)
+                          root.editingTaskTitle = modelData.title
+                          root.editingTaskPriority = modelData.priority || "medium"
+                        }
+                      }
+
+                      // Inline Editor View
+                      Row {
+                        visible: taskRowRect.isEditing
+                        anchors.fill: parent
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Style.space(4)
+
+                        TextInput {
+                          id: editInput
+                          width: parent.width - Style.space(96)
+                          anchors.verticalCenter: parent.verticalCenter
+                          text: root.editingTaskTitle
+                          color: root.fg
+                          font.family: root.ff
+                          font.pixelSize: Style.font.body
+                          clip: true
+                          focus: taskRowRect.isEditing
+                          onAccepted: {
+                            if (root.svc) root.svc.editTask(modelData.id, text, root.editingTaskPriority)
+                            root.editingTaskId = ""
+                          }
+                        }
+
+                        Button {
+                          text: Model.priorityLabel(root.editingTaskPriority)
+                          width: Style.space(36); height: Style.space(26)
+                          anchors.verticalCenter: parent.verticalCenter
+                          foreground: Model.priorityColor(root.editingTaskPriority)
+                          accent: Model.priorityColor(root.editingTaskPriority)
+                          fontFamily: root.ff
+                          fontSize: Style.font.caption * 0.85
+                          tooltipText: "Click to cycle priority"
+                          onClicked: {
+                            root.editingTaskPriority = Model.nextPriority(root.editingTaskPriority)
+                          }
+                        }
+
+                        Button {
+                          text: "✓"
+                          width: Style.space(26); height: Style.space(26)
+                          anchors.verticalCenter: parent.verticalCenter
+                          foreground: root.fg; accent: Color.accent; fontFamily: root.ff
+                          onClicked: {
+                            if (root.svc) root.svc.editTask(modelData.id, editInput.text, root.editingTaskPriority)
+                            root.editingTaskId = ""
+                          }
+                        }
+
+                        Button {
+                          text: "✕"
+                          width: Style.space(26); height: Style.space(26)
+                          anchors.verticalCenter: parent.verticalCenter
+                          foreground: Qt.darker(root.fg, 1.4); accent: Color.accent; fontFamily: root.ff
+                          onClicked: root.editingTaskId = ""
+                        }
+                      }
+                    }
+
+                    // Focus Button
                     Button {
                       anchors.verticalCenter: parent.verticalCenter
                       text: taskRowRect.isActive ? "󰌵 Active" : "󱎫 Focus"
@@ -1316,6 +1399,7 @@ Panel {
                       }
                     }
 
+                    // Delete Button
                     Button {
                       width: Style.space(28); height: Style.space(28)
                       anchors.verticalCenter: parent.verticalCenter
@@ -1325,177 +1409,6 @@ Panel {
                       fontFamily: root.ff
                       fontSize: Style.font.caption
                       onClicked: if (root.svc) root.svc.removeTask(modelData.id)
-                    }
-                  }
-
-                  // Normal View (Title and metadata)
-                  Item {
-                    visible: !taskRowRect.isEditing
-                    anchors.left: checkRect.right
-                    anchors.leftMargin: Style.space(10)
-                    anchors.right: rowActions.left
-                    anchors.rightMargin: Style.space(8)
-                    anchors.verticalCenter: parent.verticalCenter
-                    height: parent.height
-
-                    Column {
-                      anchors.verticalCenter: parent.verticalCenter
-                      width: parent.width
-                      spacing: 2
-
-                      Text {
-                        width: parent.width
-                        text: modelData.title
-                        color: modelData.done ? Qt.darker(root.fg, 1.7) : root.fg
-                        font.family: root.ff
-                        font.pixelSize: Style.font.body
-                        font.strikeout: modelData.done
-                        elide: Text.ElideRight
-                      }
-
-                      Row {
-                        spacing: Style.space(6)
-
-                        // Interactive Priority Badge (Click to cycle priority)
-                        Rectangle {
-                          anchors.verticalCenter: parent.verticalCenter
-                          height: Style.space(16)
-                          width: prioBadgeRow.implicitWidth + Style.space(8)
-                          radius: Style.space(8)
-                          color: {
-                            var p = modelData.priority || "medium"
-                            if (p === "high") return Qt.rgba(0.937, 0.267, 0.267, 0.18)
-                            if (p === "low")  return Qt.rgba(0.231, 0.510, 0.965, 0.18)
-                            return Qt.rgba(0.961, 0.620, 0.043, 0.18)
-                          }
-                          border.width: 1
-                          border.color: Model.priorityColor(modelData.priority)
-
-                          Row {
-                            id: prioBadgeRow
-                            anchors.centerIn: parent
-                            spacing: Style.space(2)
-                            Text {
-                              text: Model.priorityIcon(modelData.priority)
-                              color: Model.priorityColor(modelData.priority)
-                              font.family: root.ff
-                              font.pixelSize: 9
-                            }
-                            Text {
-                              text: Model.priorityLabel(modelData.priority)
-                              color: Model.priorityColor(modelData.priority)
-                              font.family: root.ff
-                              font.pixelSize: Style.font.caption * 0.85
-                              font.bold: true
-                            }
-                          }
-
-                          MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            hoverEnabled: true
-                            onClicked: {
-                              if (root.svc) root.svc.cycleTaskPriority(modelData.id)
-                            }
-                          }
-                        }
-
-                        Text {
-                          anchors.verticalCenter: parent.verticalCenter
-                          text: "· 󰔛 " + (modelData.pomos || 0) + " pomos"
-                          color: Color.accent
-                          font.family: root.ff
-                          font.pixelSize: Style.font.caption
-                        }
-                        Text {
-                          visible: taskRowRect.isActive
-                          anchors.verticalCenter: parent.verticalCenter
-                          text: "· Active Focus"
-                          color: Color.accent
-                          font.family: root.ff
-                          font.pixelSize: Style.font.caption
-                          font.bold: true
-                        }
-                      }
-                    }
-
-                    MouseArea {
-                      anchors.fill: parent
-                      cursorShape: Qt.PointingHandCursor
-                      onDoubleClicked: {
-                        root.editingTaskId = String(modelData.id)
-                        root.editingTaskTitle = modelData.title
-                        root.editingTaskPriority = modelData.priority || "medium"
-                      }
-                    }
-                  }
-
-                  // Inline Editor View
-                  Item {
-                    visible: taskRowRect.isEditing
-                    anchors.left: checkRect.right
-                    anchors.leftMargin: Style.space(10)
-                    anchors.right: parent.right
-                    anchors.rightMargin: Style.space(8)
-                    anchors.verticalCenter: parent.verticalCenter
-                    height: parent.height
-
-                    Row {
-                      id: editButtons
-                      anchors.right: parent.right
-                      anchors.verticalCenter: parent.verticalCenter
-                      spacing: Style.space(4)
-
-                      Button {
-                        text: Model.priorityIcon(root.editingTaskPriority) + " " + Model.priorityLabel(root.editingTaskPriority)
-                        width: Style.space(46); height: Style.space(26)
-                        anchors.verticalCenter: parent.verticalCenter
-                        foreground: Model.priorityColor(root.editingTaskPriority)
-                        accent: Model.priorityColor(root.editingTaskPriority)
-                        fontFamily: root.ff
-                        fontSize: Style.font.caption * 0.85
-                        tooltipText: "Click to cycle priority"
-                        onClicked: {
-                          root.editingTaskPriority = Model.nextPriority(root.editingTaskPriority)
-                        }
-                      }
-
-                      Button {
-                        text: "✓"
-                        width: Style.space(26); height: Style.space(26)
-                        anchors.verticalCenter: parent.verticalCenter
-                        foreground: root.fg; accent: Color.accent; fontFamily: root.ff
-                        onClicked: {
-                          if (root.svc) root.svc.editTask(modelData.id, editInput.text, root.editingTaskPriority)
-                          root.editingTaskId = ""
-                        }
-                      }
-
-                      Button {
-                        text: "✕"
-                        width: Style.space(26); height: Style.space(26)
-                        anchors.verticalCenter: parent.verticalCenter
-                        foreground: Qt.darker(root.fg, 1.4); accent: Color.accent; fontFamily: root.ff
-                        onClicked: root.editingTaskId = ""
-                      }
-                    }
-
-                    TextInput {
-                      id: editInput
-                      anchors.left: parent.left
-                      anchors.right: editButtons.left
-                      anchors.rightMargin: Style.space(6)
-                      anchors.verticalCenter: parent.verticalCenter
-                      text: root.editingTaskTitle
-                      color: root.fg
-                      font.family: root.ff
-                      font.pixelSize: Style.font.body
-                      clip: true
-                      focus: taskRowRect.isEditing
-                      onAccepted: {
-                        if (root.svc) root.svc.editTask(modelData.id, text, root.editingTaskPriority)
-                        root.editingTaskId = ""
-                      }
                     }
                   }
                 }
@@ -1525,12 +1438,12 @@ Panel {
                 width: parent.width
                 spacing: Style.space(10)
 
-                // ── Durations & Goals Card ──────────────────────────────────
+                // ── Durations Card ──────────────────────────────────────────
                 Rectangle {
                   width: parent.width
                   height: durationCol.implicitHeight + Style.space(22)
-                  radius: Style.cornerRadius
-                  color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.035)
+                  radius: Style.cornerRadius * 1.3
+                  color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
                   border.width: 1
                   border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.07)
 
@@ -1540,7 +1453,7 @@ Panel {
                     anchors.margins: Style.space(12)
                     spacing: Style.space(10)
 
-                    PanelSectionHeader { text: "󱎫 Timer Durations & Goal"; foreground: root.fg; fontFamily: root.ff }
+                    PanelSectionHeader { text: "󱎫 Timer Durations"; foreground: root.fg; fontFamily: root.ff }
 
                     // Focus Duration
                     Column {
@@ -1650,8 +1563,8 @@ Panel {
                 Rectangle {
                   width: parent.width
                   height: autoCol.implicitHeight + Style.space(22)
-                  radius: Style.cornerRadius
-                  color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.035)
+                  radius: Style.cornerRadius * 1.3
+                  color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
                   border.width: 1
                   border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.07)
 
@@ -1691,8 +1604,8 @@ Panel {
                 Rectangle {
                   width: parent.width
                   height: alertCol.implicitHeight + Style.space(22)
-                  radius: Style.cornerRadius
-                  color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.035)
+                  radius: Style.cornerRadius * 1.3
+                  color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.04)
                   border.width: 1
                   border.color: Qt.rgba(root.fg.r, root.fg.g, root.fg.b, 0.07)
 
@@ -1702,7 +1615,7 @@ Panel {
                     anchors.margins: Style.space(12)
                     spacing: Style.space(8)
 
-                    PanelSectionHeader { text: "󰂚 Completion & Alerts"; foreground: root.fg; fontFamily: root.ff }
+                    PanelSectionHeader { text: "󰂚 Completion Alerts"; foreground: root.fg; fontFamily: root.ff }
 
                     Row {
                       width: parent.width
