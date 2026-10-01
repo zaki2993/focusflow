@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "zakarch.focusflow-studio",
+  "name": "FocusFlow Studio",
+  "version": "1.0.0",
+  "author": "zakarch",
+  "license": "MIT",
+  "description": "An orbital focus workspace with tasks, distraction shielding, and a weekly rhythm.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "StudioWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "FocusFlow Studio",
+    "description": "An orbital timer and task workspace",
+    "category": "Productivity",
+    "defaultSection": "right",
+    "allowMultiple": false
+  }
+}
