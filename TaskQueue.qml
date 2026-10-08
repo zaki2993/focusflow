@@ -2,140 +2,198 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls as Controls
 import qs.Commons
-import "Model.js" as Model
 
-Item {
+// Plain task list, newest first. Click a row to link it to the timer (or ▶ to
+// link and start). Finished tasks stay in place, struck through, until deleted.
+Column {
   id: root
   property var svc: null
-  property string filter: "open"
-  property string priority: "medium"
-  property bool optionsOpen: false
-  property bool ranked: true
-  property string expandedId: ""
   property string editingId: ""
+  property int visibleRows: 6
   readonly property color fg: Color.popups.text
-  readonly property var taskModel: {
-    var all = svc ? svc.tasks : []
-    var list = all.filter(function(t) { return root.filter === "done" ? t.done : !t.done })
-    return root.ranked ? list.slice().sort(function(a,b) { return Model.priorityWeight(b.priority)-Model.priorityWeight(a.priority) }) : list
-  }
+  readonly property int rowHeight: 36
+  readonly property int doneCount: svc ? svc.tasks.length - svc.openCount : 0
+  readonly property var taskModel: svc ? svc.tasks : []
+  spacing: 6
+
   // Leaves edit mode without saving (Esc).
   function cancelEdit() { editingId = "" }
+  function focusInput() { taskInput.forceActiveFocus() }
+  // Link the task and get the timer going on it.
+  function focusNow(id) {
+    if (!svc) return
+    if (svc.activeTaskId !== String(id)) svc.setActiveTask(id)
+    if (svc.phase !== "focus") svc.startFocus()
+    else if (!svc.running) svc.resume()
+  }
   function submit() {
-    if (svc && svc.addTask(taskInput.text, optionsOpen ? priority : undefined)) taskInput.clear()
+    if (svc && svc.addTask(taskInput.text)) taskInput.clear()
   }
-  Column {
-    id: tools
-    width: parent.width; spacing: 8
-    Row {
-      width: parent.width; spacing: 6
-      StudioInput { id: taskInput; width: parent.width-addButton.width-6; placeholderText: "Add a task…"; onAccepted: root.submit() }
-      StudioButton { id: addButton; text: "+"; width: 34; height: taskInput.height; primary: true; hint: "Add task"; onClicked: root.submit() }
+  // Black or white, whichever reads better on the accent fill.
+  readonly property color tickInk: {
+    var c = Color.accent
+    function lin(v) { return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4) }
+    return lin(c.r) * 0.2126 + lin(c.g) * 0.7152 + lin(c.b) * 0.0722 > 0.179 ? "#000000" : "#ffffff"
+  }
+
+  Item {
+    width: parent.width; height: 26
+    Text {
+      anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+      text: "Tasks"; color: root.fg; textFormat: Text.PlainText
+      font.family: Style.font.family; font.pixelSize: Style.font.subtitle; font.weight: Font.DemiBold
     }
-    Item {
-      width: parent.width; height: 28
-      Row {
-        spacing: 5
-        StudioButton { text: "To do"; selected: root.filter === "open"; height: 28; onClicked: root.filter = "open" }
-        StudioButton { text: "Done"; selected: root.filter === "done"; height: 28; onClicked: root.filter = "done" }
-      }
-      StudioButton { anchors.right: parent.right; text: "Options"; quiet: true; selected: root.optionsOpen; height: 28; onClicked: root.optionsOpen = !root.optionsOpen }
-    }
-    Column {
-      visible: root.optionsOpen; width: parent.width; spacing: 6
-      Row {
-        spacing: 5
-        Repeater {
-          model: ["low","medium","high"]
-          StudioButton { required property string modelData; text: Model.priorityLabel(modelData); selected: root.priority === modelData; height: 26; hint: "Priority for new tasks"; onClicked: root.priority = modelData }
-        }
-      }
-      StudioButton { text: root.ranked ? "Sort: priority" : "Sort: newest"; quiet: true; height: 26; onClicked: root.ranked = !root.ranked }
+    StudioButton {
+      anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
+      height: 26; quiet: true; fontSize: Style.font.caption
+      visible: root.doneCount > 0
+      text: "Clear " + root.doneCount + " done"
+      hint: "Delete all finished tasks"
+      onClicked: if (root.svc) root.svc.clearCompletedTasks()
     }
   }
+
   ListView {
     id: list
-    y: tools.implicitHeight + 10
     width: parent.width
-    height: Math.max(60, root.height-y-(root.filter === "done" ? 32 : 0))
-    model: root.taskModel; clip: true; spacing: 6
+    height: Math.min(count, root.visibleRows) * root.rowHeight + Math.max(0, Math.min(count, root.visibleRows) - 1) * spacing
+    visible: count > 0
+    model: root.taskModel; clip: true; spacing: 2
+    interactive: count > root.visibleRows
     boundsBehavior: Flickable.StopAtBounds
-    Controls.ScrollBar.vertical: Controls.ScrollBar {}
-    delegate: Rectangle {
-      id: taskRow
+    Controls.ScrollBar.vertical: Controls.ScrollBar { policy: list.interactive ? Controls.ScrollBar.AsNeeded : Controls.ScrollBar.AlwaysOff }
+    delegate: Item {
+      id: row
       required property var modelData
-      readonly property bool linked: root.svc && root.svc.activeTaskId === String(modelData.id)
-      readonly property bool expanded: root.expandedId === String(modelData.id)
-      width: list.width; height: expanded ? 91 : 48
-      radius: Math.min(8,Style.cornerRadius)
-      color: linked ? Style.selectedFillFor(root.fg,Color.accent) : hover.hovered ? Style.hoverFillFor(root.fg,Color.accent) : Style.normalFillFor(root.fg,Color.accent)
-      border.width: linked ? 1 : 0; border.color: Color.accent
+      readonly property string taskId: String(modelData.id)
+      readonly property bool done: modelData.done === true
+      readonly property bool linked: !!root.svc && root.svc.activeTaskId === taskId
+      readonly property bool editing: root.editingId === taskId
+      readonly property bool active: hover.hovered || check.activeFocus || focusButton.activeFocus || editButton.activeFocus || deleteButton.activeFocus
+      readonly property int pomos: modelData.pomos || 0
+      width: list.width; height: root.rowHeight
+
       HoverHandler { id: hover }
-      // Priority marker: urgent colour for high, accent for medium, faint for low.
       Rectangle {
-        x: 3; anchors.verticalCenter: parent.top; anchors.verticalCenterOffset: 24
-        width: 3; height: 18; radius: 1.5
-        readonly property string prio: Model.validPriority(taskRow.modelData.priority)
-        color: prio === "high" ? Color.urgent : prio === "medium" ? Util.alpha(Color.accent, 0.7) : Util.alpha(root.fg, 0.25)
-        opacity: taskRow.modelData.done ? 0.4 : 1
+        anchors.fill: parent; radius: Math.min(8, Style.cornerRadius)
+        color: row.editing ? "transparent"
+             : row.active ? Style.hoverFillFor(root.fg, Color.accent)
+             : row.linked && !row.done ? Util.alpha(Color.accent, 0.12)
+             : "transparent"
+        Behavior on color { ColorAnimation { duration: 120 } }
       }
-      StudioButton {
-        x: 9; y: 12; width: 23; height: 23
-        text: taskRow.modelData.done ? "✓" : ""
-        primary: taskRow.modelData.done
-        hint: taskRow.modelData.done ? "Reopen task" : "Complete task"
-        onClicked: if (root.svc) root.svc.toggleTask(taskRow.modelData.id)
+      // The whole row links / unlinks the task; the ring and buttons sit above it.
+      MouseArea {
+        id: rowMouse
+        anchors.fill: parent; enabled: !row.done && !row.editing
+        cursorShape: Qt.PointingHandCursor
+        onClicked: if (root.svc) root.svc.setActiveTask(row.taskId)
       }
+
+      // Completion ring.
+      Rectangle {
+        id: check
+        x: 8; anchors.verticalCenter: parent.verticalCenter
+        width: 18; height: 18; radius: 9
+        color: row.done ? Color.accent : "transparent"
+        border.width: row.done ? 0 : (activeFocus ? 2.5 : 1.5)
+        border.color: activeFocus ? Color.accent : Util.alpha(root.fg, 0.55)
+        activeFocusOnTab: true
+        Accessible.role: Accessible.CheckBox
+        Accessible.name: row.modelData.title
+        Accessible.checked: row.done
+        Keys.onSpacePressed: if (root.svc) root.svc.toggleTask(row.taskId)
+        Keys.onReturnPressed: if (root.svc && !row.done) root.svc.setActiveTask(row.taskId)
+        // The task linked to the timer carries an accent dot.
+        Rectangle {
+          anchors.centerIn: parent; visible: row.linked && !row.done
+          width: 8; height: 8; radius: 4; color: Color.accent
+        }
+        Text {
+          anchors.centerIn: parent; visible: row.done
+          text: "󰄬"; color: root.tickInk
+          font.family: Style.font.family; font.pixelSize: 12
+        }
+        MouseArea {
+          anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor
+          onClicked: if (root.svc) root.svc.toggleTask(row.taskId)
+        }
+      }
+
       Text {
-        x: 41; anchors.top: parent.top; anchors.topMargin: 14; width: parent.width-83-(pomoLabel.visible ? pomoLabel.implicitWidth+8 : 0)
-        visible: root.editingId !== String(taskRow.modelData.id)
-        text: taskRow.modelData.title; textFormat: Text.PlainText; elide: Text.ElideRight
-        color: taskRow.modelData.done ? Util.alpha(root.fg,0.65) : root.fg
-        font.family: Style.font.family; font.pixelSize: Style.font.body; font.strikeout: taskRow.modelData.done
-        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: if (root.svc) root.svc.setActiveTask(taskRow.modelData.id) }
+        id: title
+        anchors.left: check.right; anchors.leftMargin: 12
+        anchors.right: row.active ? actions.left : (row.pomos > 0 ? pomoLabel.left : parent.right)
+        anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
+        visible: !row.editing
+        text: row.modelData.title; textFormat: Text.PlainText; elide: Text.ElideRight
+        color: row.done ? Util.alpha(root.fg, 0.45) : root.fg
+        font.family: Style.font.family; font.pixelSize: Style.font.body
+        font.weight: row.linked ? Font.DemiBold : Font.Normal
+        font.strikeout: row.done
       }
+
       Text {
         id: pomoLabel
-        anchors.right: parent.right; anchors.rightMargin: 40; anchors.top: parent.top; anchors.topMargin: 15
-        visible: (taskRow.modelData.pomos || 0) > 0 && root.editingId !== String(taskRow.modelData.id)
-        text: "󰔛 " + (taskRow.modelData.pomos || 0)
-        color: Util.alpha(root.fg, 0.6); font.family: Style.font.family; font.pixelSize: Style.font.caption
-        Controls.ToolTip.visible: pomoHover.hovered; Controls.ToolTip.delay: 650
-        Controls.ToolTip.text: (taskRow.modelData.pomos || 0) + " focus session" + ((taskRow.modelData.pomos || 0) === 1 ? "" : "s")
-        HoverHandler { id: pomoHover }
+        anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+        visible: row.pomos > 0 && !row.active && !row.editing
+        text: "󰔛 " + row.pomos
+        color: Util.alpha(root.fg, 0.5); font.family: Style.font.family; font.pixelSize: Style.font.caption
       }
+
+      Row {
+        id: actions
+        anchors.right: parent.right; anchors.rightMargin: 3; anchors.verticalCenter: parent.verticalCenter
+        spacing: 0
+        opacity: row.active && !row.editing ? 1 : 0
+        visible: !row.editing
+        Behavior on opacity { NumberAnimation { duration: 120 } }
+        StudioButton {
+          id: focusButton
+          width: 28; height: 28; quiet: true; icon: "󰐊"; hint: "Focus on this task now"
+          foreground: Color.accent
+          visible: !row.done && !(row.linked && !!root.svc && root.svc.phase === "focus" && root.svc.running)
+          onClicked: root.focusNow(row.taskId)
+        }
+        StudioButton {
+          id: editButton
+          width: 28; height: 28; quiet: true; icon: "󰏫"; hint: "Rename"
+          onClicked: { root.editingId = row.taskId; edit.text = row.modelData.title; edit.forceActiveFocus(); edit.selectAll() }
+        }
+        StudioButton {
+          id: deleteButton
+          width: 28; height: 28; quiet: true; icon: "󰆴"; hint: "Delete"
+          onClicked: if (root.svc) root.svc.removeTask(row.taskId)
+        }
+      }
+
       StudioInput {
         id: edit
-        x: 38; y: 7; width: parent.width-83; height: 32
-        visible: root.editingId === String(taskRow.modelData.id)
-        text: taskRow.modelData.title
+        anchors.left: check.right; anchors.leftMargin: 6; anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter; height: 32
+        visible: row.editing
         function commit() {
-          if (root.svc && text.trim()) root.svc.editTask(taskRow.modelData.id,text)
+          if (root.svc && text.trim()) root.svc.editTask(row.taskId, text)
           root.editingId = ""
         }
         onAccepted: commit()
         onEditingFinished: if (visible) commit()
-        Keys.onEscapePressed: root.editingId = ""
       }
-      StudioButton {
-        anchors.right: parent.right; anchors.rightMargin: 6; y: 10; width: 29; height: 28
-        text: taskRow.linked ? "◎" : "⋯"; quiet: true
-        hint: "Task options"; onClicked: root.expandedId = taskRow.expanded ? "" : String(taskRow.modelData.id)
-      }
-      Row {
-        x: 9; y: 52; spacing: 4; visible: taskRow.expanded
-        StudioButton { text: Model.priorityLabel(taskRow.modelData.priority); height: 27; hint: "Change priority"; onClicked: if (root.svc) root.svc.cycleTaskPriority(taskRow.modelData.id) }
-        StudioButton { text: "Edit"; height: 27; onClicked: { root.editingId = String(taskRow.modelData.id); edit.forceActiveFocus(); edit.selectAll() } }
-        StudioButton { text: taskRow.linked ? "Unlink" : "Focus"; height: 27; onClicked: if (root.svc) root.svc.setActiveTask(taskRow.modelData.id) }
-        StudioButton { text: "×"; width: 27; height: 27; hint: "Delete task"; onClicked: if (root.svc) root.svc.removeTask(taskRow.modelData.id) }
-      }
-    }
-    Text {
-      anchors.centerIn: parent; width: parent.width-24; horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
-      visible: list.count === 0
-      text: root.filter === "done" ? "Completed tasks appear here." : "Add one thing to focus on."
-      color: Util.alpha(root.fg,0.65); font.family: Style.font.family; font.pixelSize: Style.font.body
     }
   }
-  StudioButton { anchors.bottom: parent.bottom; text: "Clear completed"; height: 27; quiet: true; visible: root.filter === "done"; onClicked: if (root.svc) root.svc.clearCompletedTasks() }
+
+  Text {
+    width: parent.width; visible: list.count === 0
+    leftPadding: 2; topPadding: 2; bottomPadding: 4
+    text: "Add the one thing you want to work on."
+    wrapMode: Text.WordWrap; textFormat: Text.PlainText
+    color: Util.alpha(root.fg, 0.55); font.family: Style.font.family; font.pixelSize: Style.font.body
+  }
+
+  StudioInput {
+    id: taskInput
+    width: parent.width
+    placeholderText: "Add a task"
+    onAccepted: root.submit()
+  }
 }

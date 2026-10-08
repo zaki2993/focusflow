@@ -105,61 +105,19 @@ Item {
   }
 
   // ── Task operations ────────────────────────────────────────────────────────
-  function addTask(title, priority) {
-    var parsed = Model.parseTaskInput(title)
-    var val = parsed.title || String(title || "").trim()
+  function addTask(title) {
+    var val = String(title || "").trim()
     if (!val) return false
-    var prio = priority ? Model.validPriority(priority) : (parsed.priority || "medium")
     var next = tasks.slice()
     next.unshift({
       id: String(Date.now()) + Math.random(),
       title: val,
       done: false,
-      pomos: 0,
-      priority: prio
+      pomos: 0
     })
     tasks = next
     scheduleSave()
     return true
-  }
-
-  function setTaskPriority(id, priority) {
-    var prio = Model.validPriority(priority)
-    var next = tasks.slice()
-    for (var i = 0; i < next.length; i++) {
-      if (String(next[i].id) === String(id)) {
-        next[i] = {
-          id: next[i].id,
-          title: next[i].title,
-          done: next[i].done,
-          pomos: next[i].pomos || 0,
-          priority: prio
-        }
-        break
-      }
-    }
-    tasks = next
-    scheduleSave()
-  }
-
-  function cycleTaskPriority(id) {
-    var next = tasks.slice()
-    for (var i = 0; i < next.length; i++) {
-      if (String(next[i].id) === String(id)) {
-        var currentPrio = Model.validPriority(next[i].priority)
-        var nextPrio = Model.nextPriority(currentPrio)
-        next[i] = {
-          id: next[i].id,
-          title: next[i].title,
-          done: next[i].done,
-          pomos: next[i].pomos || 0,
-          priority: nextPrio
-        }
-        break
-      }
-    }
-    tasks = next
-    scheduleSave()
   }
 
   function toggleTask(id) {
@@ -172,13 +130,14 @@ Item {
           id: next[i].id,
           title: next[i].title,
           done: nowDone,
-          pomos: next[i].pomos || 0,
-          priority: Model.validPriority(next[i].priority)
+          pomos: next[i].pomos || 0
         }
         break
       }
     }
     tasks = next
+    // A finished task stays in the list but stops collecting focus sessions.
+    if (nowDone && activeTaskId === String(id)) activeTaskId = ""
     scheduleSave()
     if (nowDone) {
       playTaskDoneSound()
@@ -221,21 +180,17 @@ Item {
     scheduleSave()
   }
 
-  function editTask(id, newTitle, newPriority) {
+  function editTask(id, newTitle) {
     var val = String(newTitle || "").trim()
     if (!val) return false
     var next = tasks.slice()
     for (var i = 0; i < next.length; i++) {
       if (String(next[i].id) === String(id)) {
-        var prio = (newPriority !== undefined && newPriority !== null)
-          ? Model.validPriority(newPriority)
-          : Model.validPriority(next[i].priority)
         next[i] = {
           id: next[i].id,
           title: val,
           done: next[i].done,
-          pomos: next[i].pomos || 0,
-          priority: prio
+          pomos: next[i].pomos || 0
         }
         break
       }
@@ -254,8 +209,7 @@ Item {
           id: next[i].id,
           title: next[i].title,
           done: next[i].done,
-          pomos: (next[i].pomos || 0) + 1,
-          priority: Model.validPriority(next[i].priority)
+          pomos: (next[i].pomos || 0) + 1
         }
         break
       }
@@ -631,8 +585,7 @@ Item {
             id: String(t.id || Date.now() + i),
             title: String(t.title).trim(),
             done: t.done === true,
-            pomos: parseInt(t.pomos, 10) || 0,
-            priority: Model.validPriority(t.priority)
+            pomos: parseInt(t.pomos, 10) || 0
           })
       }
     }
@@ -807,17 +760,6 @@ Item {
     }
     function addTask(title: string): string {
       return root.addTask(title) ? "ok" : "err:empty"
-    }
-    function addTaskWithPriority(title: string, priority: string): string {
-      return root.addTask(title, priority) ? "ok" : "err:empty"
-    }
-    function setPriority(id: string, priority: string): string {
-      root.setTaskPriority(id, priority)
-      return "ok"
-    }
-    function cyclePriority(id: string): string {
-      root.cycleTaskPriority(id)
-      return "ok"
     }
     function editTask(id: string, title: string): string {
       return root.editTask(id, title) ? "ok" : "err"

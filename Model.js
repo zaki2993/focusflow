@@ -138,46 +138,6 @@ function dailyGoalPercent(count, goal) {
   return Math.min(100, Math.round((c / g) * 100))
 }
 
-function validPriority(value) {
-  var s = String(value || "").toLowerCase().trim()
-  if (s === "high" || s === "h" || s === "urgent") return "high"
-  if (s === "low" || s === "l") return "low"
-  if (s === "medium" || s === "med" || s === "m" || s === "normal") return "medium"
-  return "medium"
-}
-
-function priorityWeight(priority) {
-  var p = validPriority(priority)
-  if (p === "high") return 3
-  if (p === "medium") return 2
-  if (p === "low") return 1
-  return 2
-}
-
-function priorityColor(priority) {
-  var p = validPriority(priority)
-  if (p === "high") return "#ef4444"
-  if (p === "medium") return "#f59e0b"
-  if (p === "low") return "#3b82f6"
-  return "#f59e0b"
-}
-
-function priorityLabel(priority) {
-  var p = validPriority(priority)
-  if (p === "high") return "High"
-  if (p === "medium") return "Medium"
-  if (p === "low") return "Low"
-  return "Medium"
-}
-
-function priorityIcon(priority) {
-  var p = validPriority(priority)
-  if (p === "high") return "▲"
-  if (p === "medium") return "▬"
-  if (p === "low") return "▼"
-  return "▬"
-}
-
 function taskStats(tasks) {
   if (!Array.isArray(tasks)) return { total: 0, done: 0, pending: 0, percent: 0 }
   var total = tasks.length
@@ -188,26 +148,6 @@ function taskStats(tasks) {
   var pending = total - done
   var percent = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
   return { total: total, done: done, pending: pending, percent: percent }
-}
-
-function nextPriority(priority) {
-  var p = validPriority(priority)
-  if (p === "medium") return "high"
-  if (p === "high") return "low"
-  return "medium"
-}
-
-function parseTaskInput(text) {
-  var s = String(text || "").trim()
-  if (!s) return { title: "", priority: null }
-  var regex = /(?:^|\s)(?:!|#|p:)(high|med|medium|urgent|h|low|l|m)(?:\b|$)/i
-  var match = regex.exec(s)
-  if (match) {
-    var prio = validPriority(match[1])
-    var cleanTitle = s.replace(match[0], " ").replace(/\s+/g, " ").trim()
-    return { title: cleanTitle, priority: prio }
-  }
-  return { title: s, priority: null }
 }
 
 // ── Web App Blocker Helpers ──────────────────────────────────────────────────
@@ -447,10 +387,6 @@ if (typeof module !== "undefined") {
     pruneSessions: pruneSessions, formatMinutes: formatMinutes,
     validFocusLog: validFocusLog, pruneFocusLog: pruneFocusLog,
     dailyGoalPercent: dailyGoalPercent, taskStats: taskStats,
-    validPriority: validPriority, priorityWeight: priorityWeight,
-    priorityColor: priorityColor, priorityLabel: priorityLabel,
-    priorityIcon: priorityIcon, nextPriority: nextPriority,
-    parseTaskInput: parseTaskInput,
     defaultBlockedWebApps: defaultBlockedWebApps,
     presetWebApps: presetWebApps,
     cleanDomain: cleanDomain,

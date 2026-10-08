@@ -30,8 +30,7 @@ BarWidget {
       else state += " · Paused"
       lines.push(state)
       if (svc.activeTask) {
-        var prioTag = svc.activeTask.priority ? ("[" + Model.priorityLabel(svc.activeTask.priority) + "] ") : ""
-        lines.push("Task: " + prioTag + svc.activeTask.title)
+        lines.push("Task: " + svc.activeTask.title)
       }
     }
     var focusTimeText = svc.totalFocusMinutesToday > 0 ? (" · " + Model.formatMinutes(svc.totalFocusMinutesToday) + " focused") : ""
