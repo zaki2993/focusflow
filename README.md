@@ -29,13 +29,7 @@ omarchy plugin add https://github.com/zaki2993/focusflow --enable
 ## Remove
 
 ```bash
-omarchy plugin remove zakarch.focusflow
-```
-
-To also delete your tasks and history:
-
-```bash
-rm ~/.local/state/omarchy/zakarch.focusflow.json
+omarchy plugin remove zakarch.focusflow && rm ~/.local/state/omarchy/zakarch.focusflow.json
 ```
 
 ## Files
