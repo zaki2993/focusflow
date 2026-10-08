@@ -190,6 +190,30 @@ function presetWebApps() {
   return JSON.parse(JSON.stringify(PRESET_BLOCKED_APPS))
 }
 
+// The built-in preset name for a blocked site, or "" when the site is one the
+// user typed in. Only preset names are safe to put in notification text, which
+// travels as process arguments that any local user can read.
+function publicSiteName(app) {
+  var d = cleanDomain(app && app.domain)
+  if (!d) return ""
+  for (var i = 0; i < PRESET_BLOCKED_APPS.length; i++) {
+    var p = PRESET_BLOCKED_APPS[i].domain
+    if (d === p || d.slice(-(p.length + 1)) === "." + p) return PRESET_BLOCKED_APPS[i].name
+  }
+  return ""
+}
+
+// "YouTube", "YouTube and Reddit", "YouTube and 2 other sites", "2 blocked sites".
+function describeSites(names, others) {
+  var parts = names.slice()
+  if (others > 0) {
+    if (parts.length === 0) return others === 1 ? "a blocked site" : others + " blocked sites"
+    parts.push(others + (others === 1 ? " other site" : " other sites"))
+  }
+  if (parts.length <= 1) return parts.join("")
+  return parts.slice(0, -1).join(", ") + " and " + parts[parts.length - 1]
+}
+
 function cleanDomain(input) {
   var s = String(input || "").trim().toLowerCase()
   s = s.replace(/^[a-zA-Z]+:\/\//, "")
@@ -390,6 +414,8 @@ if (typeof module !== "undefined") {
     defaultBlockedWebApps: defaultBlockedWebApps,
     presetWebApps: presetWebApps,
     cleanDomain: cleanDomain,
+    publicSiteName: publicSiteName,
+    describeSites: describeSites,
     guessWebappName: guessWebappName,
     webappIcon: webappIcon,
     parseWebappInput: parseWebappInput,

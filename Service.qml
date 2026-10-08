@@ -158,6 +158,9 @@ Item {
     playSoundFile("/usr/share/sounds/freedesktop/stereo/" + name + ".oga")
   }
 
+  // Notification text is passed as process arguments (here and on to busctl),
+  // which every local user can read in /proc. Only fixed strings and preset
+  // site names may go in; never task titles or user-entered domains.
   function notify(title, body, glyph) {
     var notifBin = omarchyPath ? (omarchyPath + "/bin/omarchy-notification-send") : "omarchy-notification-send"
     Quickshell.execDetached([notifBin, title, body, "-g", glyph])
@@ -349,16 +352,19 @@ Item {
       switchAwayFromWindow()
     }
 
-    if (blockerAction === "notify" || now - lastBlockNotificationTime > 3000 || lastBlockedAppNotified !== matchedApp.name) {
+    var appKey = String(matchedApp.id)
+    if (blockerAction === "notify" || now - lastBlockNotificationTime > 3000 || lastBlockedAppNotified !== appKey) {
       lastBlockNotificationTime = now
-      lastBlockedAppNotified = matchedApp.name
+      lastBlockedAppNotified = appKey
       _bumpBlockedCount(1)
 
-      var body = blockerAction === "close" ? matchedApp.name + " was closed. Stay in flow until your break."
-               : blockerAction === "switch" ? matchedApp.name + " is blocked until your break."
-               : matchedApp.name + " is on your blocked list. Back to focus?"
+      var publicName = Model.publicSiteName(matchedApp)
+      var site = publicName || "A blocked site"
+      var body = blockerAction === "close" ? site + " was closed. Stay in flow until your break."
+               : blockerAction === "switch" ? site + " is blocked until your break."
+               : site + " is open. Back to focus?"
       if (soundAlert) playThemeSound("dialog-warning")
-      notify("FocusFlow", body, Model.webappIcon(matchedApp.name))
+      notify("FocusFlow", body, publicName ? Model.webappIcon(publicName) : "󰈈")
     }
   }
 
@@ -371,7 +377,8 @@ Item {
     // "switch" only reacts to the focused window; the active-window check covers it.
     if (blockerAction === "switch") return
 
-    var names = []
+    var names = []      // preset names, safe to show
+    var matched = []    // ids of every distinct blocked site found
     var seen = Object.assign({}, _notifiedWindows)
     for (var i = 0; i < clients.length; i++) {
       var win = clients[i]
@@ -380,15 +387,20 @@ Item {
       if (!matchedApp) continue
       if (blockerAction === "close") closeHyprlandWindow(win.address)
       else seen[win.address] = true
-      if (names.indexOf(matchedApp.name) === -1) names.push(matchedApp.name)
+      if (matched.indexOf(String(matchedApp.id)) !== -1) continue
+      matched.push(String(matchedApp.id))
+      var publicName = Model.publicSiteName(matchedApp)
+      if (publicName && names.indexOf(publicName) === -1) names.push(publicName)
     }
     _notifiedWindows = seen
 
-    if (names.length > 0) {
-      _bumpBlockedCount(names.length)
+    if (matched.length > 0) {
+      _bumpBlockedCount(matched.length)
+      var sites = Model.describeSites(names, matched.length - names.length)
+      var plural = matched.length > 1
       var body = blockerAction === "close"
-        ? "Closed " + names.join(", ") + " for this focus session."
-        : names.join(", ") + (names.length === 1 ? " is" : " are") + " open. Close " + (names.length === 1 ? "it" : "them") + " to stay in flow."
+        ? "Closed " + sites + " for this focus session."
+        : sites.charAt(0).toUpperCase() + sites.slice(1) + (plural ? " are" : " is") + " open. Close " + (plural ? "them" : "it") + " to stay in flow."
       notify("FocusFlow", body, "󰈈")
     }
   }
@@ -474,8 +486,7 @@ Item {
     if (completedPhase === "focus") {
       _bumpActiveTaskPomos()
       recordSession(Math.round(totalMs / 60000))
-      var taskName = activeTask ? " · \"" + activeTask.title + "\"" : ""
-      remind("FocusFlow", "Focus complete" + taskName + ". Time for a break.", "󰔛")
+      remind("FocusFlow", "Focus complete. Time for a break.", "󰔛", activeTask ? activeTask.title : "")
       if (autoStartBreak) startBreak()
       else phase = "idle"
     } else if (completedPhase === "break") {
@@ -503,11 +514,13 @@ Item {
   property string overlayBody: ""
   property string overlayGlyph: "󰔛"
 
-  function remind(title, body, glyph) {
+  // `detail` is private text (a task title). It is shown only in the in-shell
+  // overlay and never handed to notify(), which would expose it in argv.
+  function remind(title, body, glyph, detail) {
     if (soundAlert) playThemeSound("complete")
     if (reminderMode === "overlay") {
       overlayTitle = title
-      overlayBody = body
+      overlayBody = detail ? body + "\n" + detail : body
       overlayGlyph = glyph
       overlayVisible = true
     } else {
