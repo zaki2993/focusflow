@@ -1,4 +1,5 @@
-// Pure pomodoro math + date bucketing (shared logic from lucas.pomodoro, adapted for Focus Flow)
+// Pure helpers for FocusFlow: pomodoro math, date bucketing, tasks, and shield matching.
+// Date helpers adapted from lucas.pomodoro.
 
 var MS_PER_DAY = 86400000
 
@@ -100,6 +101,25 @@ function pruneSessions(sessions, now, days) {
   var key = dateKey(cutoff)
   var out = []
   for (var i = 0; i < sessions.length; i++) if (sessions[i] >= key) out.push(sessions[i])
+  return out
+}
+
+function validFocusLog(raw) {
+  var out = {}
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out
+  for (var key in raw) {
+    var p = parseKey(key)
+    var mins = parseInt(raw[key], 10)
+    if (p && isFinite(mins) && mins > 0) out[dateKey(new Date(p.year, p.month, p.day))] = mins
+  }
+  return out
+}
+
+// Returns a copy without entries older than `days`.
+function pruneFocusLog(log, now, days) {
+  var cutoff = dateKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - days))
+  var out = {}
+  for (var key in log) if (key >= cutoff) out[key] = log[key]
   return out
 }
 
@@ -425,6 +445,7 @@ if (typeof module !== "undefined") {
     formatRemaining: formatRemaining, clampInt: clampInt,
     validReminderMode: validReminderMode, validSessions: validSessions,
     pruneSessions: pruneSessions, formatMinutes: formatMinutes,
+    validFocusLog: validFocusLog, pruneFocusLog: pruneFocusLog,
     dailyGoalPercent: dailyGoalPercent, taskStats: taskStats,
     validPriority: validPriority, priorityWeight: priorityWeight,
     priorityColor: priorityColor, priorityLabel: priorityLabel,

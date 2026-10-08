@@ -7,8 +7,8 @@ import "Model.js" as Model
 
 Panel {
   id: root
-  moduleName: "zakarch.focusflow-studio"
-  ipcTarget: "zakarch.focusflow-studio.panel"
+  moduleName: "zakarch.focusflow"
+  ipcTarget: "zakarch.focusflow.panel"
   manageIpc: false
   property var anchorItem: null
   property var hostWidget: null
@@ -16,7 +16,7 @@ Panel {
   readonly property var svc: bar && bar.shell ? bar.shell.serviceFor(moduleName) : null
   readonly property color fg: Color.popups.text
   readonly property color accent: Color.accent
-  property int activeTab: 0
+  property int activeTab: 0   // 0 Focus · 1 Tasks · 2 Settings
   property string settingsPage: "general"   // "general" | "shield" | "activity"
   property bool confirmListReset: false
   property string blockerFeedback: ""
@@ -28,16 +28,13 @@ Panel {
   readonly property var shieldActions: [{id: "notify", label: "Notify"}, {id: "switch", label: "Switch away"}, {id: "close", label: "Close"}]
   readonly property var shieldHints: ({
     notify: "Only sends a notification when a blocked site opens.",
-    switch: "Jumps to the next workspace when a blocked site is focused.",
+    switch: "Jumps back to your previous workspace when a blocked site is focused.",
     close: "Closes matching windows. Unsaved work in them is lost."
   })
-  onActiveTabChanged: { scroller.contentY = 0; if (activeTab === 2) settingsPage = "shield" }
+  onActiveTabChanged: scroller.contentY = 0
   onSettingsPageChanged: { scroller.contentY = 0; confirmListReset = false }
-  function layoutStatus() {
-    return JSON.stringify({version: "compact-2", width: panel.contentWidth, height: panel.contentHeight, background: String(Color.popups.background), foreground: String(root.fg), accent: String(root.accent), font: Style.font.family, page: root.activeTab, primaryText: String(startButton.primaryTextColor)})
-  }
   function showSettings(section) {
-    activeTab = 3
+    activeTab = 2
     settingsPage = section === "shield" ? "shield" : section === "activity" ? "activity" : "general"
     scroller.contentY = 0
   }
@@ -171,11 +168,22 @@ Panel {
       onTextKey: function(t) {
         if (t === "1") root.activeTab = 0
         else if (t === "2") root.activeTab = 1
-        else if (t === "3" || t === "4") root.activeTab = 3
+        else if (t === "3") root.activeTab = 2
         else if (t.toLowerCase() === "s" || t.toLowerCase() === "p") root.primaryAction()
         else if (t.toLowerCase() === "r" && root.svc) root.svc.reset()
       }
-      Shortcut { sequence: "Escape"; enabled: root.opened; onActivated: root.close() }
+      // Esc in a text field first leaves the field (cancelling a task edit);
+      // a second Esc closes the panel.
+      Shortcut {
+        sequence: "Escape"; enabled: root.opened
+        onActivated: {
+          var f = keyCatcher.Window.activeFocusItem
+          if (f && f !== keyCatcher && f.cursorPosition !== undefined) {
+            taskQueue.cancelEdit()
+            keyCatcher.forceActiveFocus()
+          } else root.close()
+        }
+      }
       Flickable {
         id: scroller; anchors.fill: parent; clip: true
         contentWidth: width; contentHeight: main.implicitHeight
@@ -186,7 +194,7 @@ Panel {
           Item {
             width: parent.width; height: 25
             Copy { anchors.verticalCenter: parent.verticalCenter; text: "◎ FocusFlow"; font.pixelSize: Style.font.title; font.weight: Font.DemiBold }
-            StudioButton { anchors.right: parent.right; text: root.activeTab >= 2 ? "Back" : "Settings"; width: 82; height: 25; quiet: true; hint: "Settings"; onClicked: { root.activeTab = root.activeTab >= 2 ? 0 : 3; keyCatcher.forceActiveFocus() } }
+            StudioButton { anchors.right: parent.right; text: root.activeTab >= 2 ? "Back" : "Settings"; width: 82; height: 25; quiet: true; hint: "Settings"; onClicked: { root.activeTab = root.activeTab >= 2 ? 0 : 2; keyCatcher.forceActiveFocus() } }
           }
           Row {
             visible: root.activeTab < 2; width: parent.width; spacing: 6
@@ -199,7 +207,7 @@ Panel {
             Row {
               width: parent.width; spacing: 6
               StudioButton { id: startButton; width: parent.width-40; height: 36; primary: true; enabled: !!root.svc; text: !root.svc || root.svc.phase === "idle" ? "Start focus" : root.svc.running ? "Pause" : "Resume"; onClicked: root.primaryAction() }
-              StudioButton { width: 34; height: 36; text: "↺"; hint: "Reset session"; onClicked: if (root.svc) root.svc.reset() }
+              StudioButton { width: 34; height: 36; text: "󰑓"; hint: "Reset session"; onClicked: if (root.svc) root.svc.reset() }
             }
             Rectangle {
               width: parent.width; height: 38; radius: Math.min(8,Style.cornerRadius)
@@ -210,14 +218,32 @@ Panel {
             }
             Item {
               width: parent.width; height: 22
-              Caption { anchors.verticalCenter: parent.verticalCenter; text: root.svc ? root.svc.countToday + " / " + root.svc.dailyGoal + " sessions today" : "Connecting…" }
+              Row {
+                id: goalRow
+                anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                // One pip per session toward the daily goal (capped so it never crowds the row).
+                Row {
+                  anchors.verticalCenter: parent.verticalCenter; spacing: 4
+                  visible: !!root.svc && root.svc.dailyGoal <= 12
+                  Repeater {
+                    model: root.svc ? Math.min(12, root.svc.dailyGoal) : 0
+                    Rectangle {
+                      required property int index
+                      width: 7; height: 7; radius: 3.5
+                      color: root.svc && index < root.svc.countToday ? root.accent : "transparent"
+                      border.width: 1; border.color: root.svc && index < root.svc.countToday ? root.accent : Util.alpha(root.fg, 0.35)
+                    }
+                  }
+                }
+                Caption { anchors.verticalCenter: parent.verticalCenter; text: root.svc ? root.svc.countToday + " / " + root.svc.dailyGoal + " today" : "Connecting…" }
+              }
               StudioButton { anchors.right: parent.right; text: "Break"; height: 22; quiet: true; hint: "Start a break"; onClicked: if (root.svc) root.svc.startBreak() }
             }
           }
           Column {
             visible: root.activeTab === 1; width: parent.width; spacing: 10
             Caption { text: "Click a task to focus on it.  ⋯ for more."; width: parent.width; wrapMode: Text.WordWrap }
-            TaskQueue { width: parent.width; height: 313; svc: root.svc }
+            TaskQueue { id: taskQueue; width: parent.width; height: 313; svc: root.svc }
           }
           Column {
             visible: root.activeTab >= 2; width: parent.width; spacing: 10
@@ -308,8 +334,19 @@ Panel {
                   }
                 }
 
-                SectionLabel { topPadding: 12; text: "QUICK ADD" }
-                Flow { width: parent.width; spacing: 4; Repeater { model: Model.presetWebApps(); StudioButton { required property var modelData; text: "+ " + modelData.name; height: 26; quiet: true; onClicked: if (root.svc) root.svc.addPresetWebApp(modelData.id) } } }
+                SectionLabel { topPadding: 12; text: "QUICK ADD"; visible: presetRepeater.count > 0 }
+                Flow {
+                  width: parent.width; spacing: 4
+                  Repeater {
+                    id: presetRepeater
+                    // Only presets that are not on the list yet.
+                    model: {
+                      var listed = root.svc ? root.svc.blockedWebApps.map(function(a) { return a.domain }) : []
+                      return Model.presetWebApps().filter(function(p) { return listed.indexOf(p.domain) === -1 })
+                    }
+                    StudioButton { required property var modelData; text: "+ " + modelData.name; height: 26; quiet: true; onClicked: if (root.svc) root.svc.addPresetWebApp(modelData.id) }
+                  }
+                }
                 StudioButton {
                   width: parent.width; height: 28; quiet: true
                   text: root.confirmListReset ? "Click again to replace the list with defaults" : "Restore default list"

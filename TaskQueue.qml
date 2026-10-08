@@ -19,6 +19,8 @@ Item {
     var list = all.filter(function(t) { return root.filter === "done" ? t.done : !t.done })
     return root.ranked ? list.slice().sort(function(a,b) { return Model.priorityWeight(b.priority)-Model.priorityWeight(a.priority) }) : list
   }
+  // Leaves edit mode without saving (Esc).
+  function cancelEdit() { editingId = "" }
   function submit() {
     if (svc && svc.addTask(taskInput.text, optionsOpen ? priority : undefined)) taskInput.clear()
   }
@@ -69,6 +71,14 @@ Item {
       color: linked ? Style.selectedFillFor(root.fg,Color.accent) : hover.hovered ? Style.hoverFillFor(root.fg,Color.accent) : Style.normalFillFor(root.fg,Color.accent)
       border.width: linked ? 1 : 0; border.color: Color.accent
       HoverHandler { id: hover }
+      // Priority marker: urgent colour for high, accent for medium, faint for low.
+      Rectangle {
+        x: 3; anchors.verticalCenter: parent.top; anchors.verticalCenterOffset: 24
+        width: 3; height: 18; radius: 1.5
+        readonly property string prio: Model.validPriority(taskRow.modelData.priority)
+        color: prio === "high" ? Color.urgent : prio === "medium" ? Util.alpha(Color.accent, 0.7) : Util.alpha(root.fg, 0.25)
+        opacity: taskRow.modelData.done ? 0.4 : 1
+      }
       StudioButton {
         x: 9; y: 12; width: 23; height: 23
         text: taskRow.modelData.done ? "✓" : ""
@@ -77,12 +87,22 @@ Item {
         onClicked: if (root.svc) root.svc.toggleTask(taskRow.modelData.id)
       }
       Text {
-        x: 41; anchors.top: parent.top; anchors.topMargin: 14; width: parent.width-83
+        x: 41; anchors.top: parent.top; anchors.topMargin: 14; width: parent.width-83-(pomoLabel.visible ? pomoLabel.implicitWidth+8 : 0)
         visible: root.editingId !== String(taskRow.modelData.id)
         text: taskRow.modelData.title; textFormat: Text.PlainText; elide: Text.ElideRight
         color: taskRow.modelData.done ? Util.alpha(root.fg,0.65) : root.fg
         font.family: Style.font.family; font.pixelSize: Style.font.body; font.strikeout: taskRow.modelData.done
         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: if (root.svc) root.svc.setActiveTask(taskRow.modelData.id) }
+      }
+      Text {
+        id: pomoLabel
+        anchors.right: parent.right; anchors.rightMargin: 40; anchors.top: parent.top; anchors.topMargin: 15
+        visible: (taskRow.modelData.pomos || 0) > 0 && root.editingId !== String(taskRow.modelData.id)
+        text: "󰔛 " + (taskRow.modelData.pomos || 0)
+        color: Util.alpha(root.fg, 0.6); font.family: Style.font.family; font.pixelSize: Style.font.caption
+        Controls.ToolTip.visible: pomoHover.hovered; Controls.ToolTip.delay: 650
+        Controls.ToolTip.text: (taskRow.modelData.pomos || 0) + " focus session" + ((taskRow.modelData.pomos || 0) === 1 ? "" : "s")
+        HoverHandler { id: pomoHover }
       }
       StudioInput {
         id: edit

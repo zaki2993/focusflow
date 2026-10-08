@@ -7,7 +7,7 @@ import qs.Commons
 import qs.Ui
 import "Model.js" as Model
 
-// Focus Flow — unified pomodoro + task service.
+// FocusFlow — pomodoro timer, tasks, and distraction shield.
 Item {
   id: root
 
@@ -16,16 +16,24 @@ Item {
   property var manifest: null
 
   readonly property string home: Quickshell.env("HOME")
-  readonly property string statePath: home + "/.local/state/omarchy/focusflow-studio.json"
+  readonly property string stateDir: home + "/.local/state/omarchy"
+  readonly property string statePath: stateDir + "/zakarch.focusflow.json"
+  // Files from earlier releases, imported once when no state file exists yet.
+  readonly property var legacyStatePaths: [stateDir + "/focusflow-studio.json"]
+  property int _legacyIndex: 0
+  readonly property string taskDoneSound: String(Qt.resolvedUrl("sounds/task_done.wav")).replace(/^file:\/\//, "")
 
   // ── Web App Blocker settings & state ─────────────────────────────────────────
   property bool blockerEnabled: true
-  property string blockerAction: "close"   // "close" | "switch" | "notify"
+  property string blockerAction: "notify"   // "notify" | "switch" | "close"
   property bool blockerScanOnStart: true
   property var blockedWebApps: Model.defaultBlockedWebApps()
   property int blockedCountToday: 0
+  property string blockedCountDate: ""
   property double lastBlockNotificationTime: 0
   property string lastBlockedAppNotified: ""
+  // Windows already reported in this focus session (notify mode), keyed by address.
+  property var _notifiedWindows: ({})
 
   readonly property int activeBlockedCount: {
     var count = 0
@@ -49,7 +57,10 @@ Item {
 
   // ── Pomodoro stats ─────────────────────────────────────────────────────────
   property var sessions: []
-  readonly property int totalFocusMinutesToday: countToday * focusMinutes
+  // Actual focused minutes per day ({ "YYYY-MM-DD": minutes }), so changing the
+  // focus length later does not rewrite history.
+  property var focusLog: ({})
+  readonly property int totalFocusMinutesToday: focusLog[Model.dateKey(new Date(_now))] || 0
 
   // ── Pomodoro runtime ───────────────────────────────────────────────────────
   property string phase: "idle"   // "idle" | "focus" | "break"
@@ -175,9 +186,22 @@ Item {
   }
 
   function playTaskDoneSound() {
-    if (!taskSoundAlert) return
-    var soundPath = home + "/.config/omarchy/plugins/zakarch.focusflow-studio/sounds/task_done.wav"
-    Quickshell.execDetached(["bash", "-c", "canberra-gtk-play -f " + soundPath + " 2>/dev/null || pw-play " + soundPath + " 2>/dev/null || paplay " + soundPath + " 2>/dev/null"])
+    if (taskSoundAlert) playSoundFile(taskDoneSound)
+  }
+
+  // Plays a file with whichever PipeWire/Pulse player is installed. The path is
+  // passed as an argument, never interpolated into the shell string.
+  function playSoundFile(path) {
+    Quickshell.execDetached(["sh", "-c", 'pw-play "$1" 2>/dev/null || paplay "$1" 2>/dev/null || canberra-gtk-play -f "$1" 2>/dev/null', "sh", path])
+  }
+
+  function playThemeSound(name) {
+    playSoundFile("/usr/share/sounds/freedesktop/stereo/" + name + ".oga")
+  }
+
+  function notify(title, body, glyph) {
+    var notifBin = omarchyPath ? (omarchyPath + "/bin/omarchy-notification-send") : "omarchy-notification-send"
+    Quickshell.execDetached([notifBin, title, body, "-g", glyph])
   }
 
   function removeTask(id) {
@@ -193,6 +217,7 @@ Item {
 
   function clearCompletedTasks() {
     tasks = tasks.filter(function(t) { return !t.done })
+    if (activeTaskId && !activeTask) activeTaskId = ""
     scheduleSave()
   }
 
@@ -305,17 +330,31 @@ Item {
     scheduleSave()
   }
 
+  // Closes exactly one window. The `window = "address:…"` selector is required:
+  // other forms are ignored by Hyprland's Lua dispatcher, which then closes the
+  // focused window instead. Without a well-formed address, nothing is closed.
   function closeHyprlandWindow(address) {
-    if (address) {
-      var luaCmd = 'hl.dispatch(hl.dsp.window.close({ address = "' + address + '" }))'
-      Quickshell.execDetached(["bash", "-c", "hyprctl eval '" + luaCmd + "' 2>/dev/null || hyprctl dispatch closewindow address:" + address + " 2>/dev/null"])
-    } else {
-      Quickshell.execDetached(["bash", "-c", "hyprctl eval 'hl.dispatch(hl.dsp.window.close())' 2>/dev/null || hyprctl dispatch 'hl.dsp.window.close()' 2>/dev/null"])
+    var addr = String(address || "")
+    if (!/^0x[0-9a-fA-F]+$/.test(addr)) return
+    Quickshell.execDetached(["hyprctl", "dispatch", 'hl.dsp.window.close({ window = "address:' + addr + '" })'])
+  }
+
+  function switchAwayFromWindow() {
+    Quickshell.execDetached(["hyprctl", "dispatch", 'hl.dsp.focus({ workspace = "previous" })'])
+  }
+
+  function _bumpBlockedCount(n) {
+    var today = Model.dateKey(new Date())
+    if (blockedCountDate !== today) {
+      blockedCountDate = today
+      blockedCountToday = 0
     }
+    blockedCountToday += n
+    scheduleSave()
   }
 
   function checkAndEnforceBlocker() {
-    if (!running || phase !== "focus" || !blockerEnabled) return
+    if (!running || phase !== "focus" || !blockerEnabled || activeBlockedCount === 0) return
     if (!activeWindowCheckProc.running) {
       activeWindowCheckProc.running = true
     }
@@ -344,27 +383,28 @@ Item {
     var address = String(win.address || "")
     var now = Date.now()
 
-    if (blockerAction === "close") {
+    if (blockerAction === "notify") {
+      // Remind once per window per session instead of on every poll.
+      if (_notifiedWindows[address]) return
+      var seen = Object.assign({}, _notifiedWindows)
+      seen[address] = true
+      _notifiedWindows = seen
+    } else if (blockerAction === "close") {
       closeHyprlandWindow(address)
     } else if (blockerAction === "switch") {
-      Quickshell.execDetached(["hyprctl", "dispatch", "workspace", "m+1"])
+      switchAwayFromWindow()
     }
 
-    if (now - lastBlockNotificationTime > 3000 || lastBlockedAppNotified !== matchedApp.name) {
+    if (blockerAction === "notify" || now - lastBlockNotificationTime > 3000 || lastBlockedAppNotified !== matchedApp.name) {
       lastBlockNotificationTime = now
       lastBlockedAppNotified = matchedApp.name
-      blockedCountToday++
-      scheduleSave()
+      _bumpBlockedCount(1)
 
-      var notifTitle = "Focus Flow Blocker"
-      var notifBody = matchedApp.name + " is blocked during your focus session! 🛑\nStay in flow until break time."
-      var glyph = Model.webappIcon(matchedApp.name)
-
-      if (soundAlert) {
-        Quickshell.execDetached(["canberra-gtk-play", "-i", "dialog-warning"])
-      }
-      var notifBin = (omarchyPath ? (omarchyPath + "/bin/omarchy-notification-send") : "omarchy-notification-send")
-      Quickshell.execDetached([notifBin, notifTitle, notifBody, "-g", glyph])
+      var body = blockerAction === "close" ? matchedApp.name + " was closed. Stay in flow until your break."
+               : blockerAction === "switch" ? matchedApp.name + " is blocked until your break."
+               : matchedApp.name + " is on your blocked list. Back to focus?"
+      if (soundAlert) playThemeSound("dialog-warning")
+      notify("FocusFlow", body, Model.webappIcon(matchedApp.name))
     }
   }
 
@@ -374,28 +414,28 @@ Item {
     try { clients = JSON.parse(raw || "[]") } catch (e) { return }
     if (!Array.isArray(clients)) return
 
-    var closedNames = []
+    // "switch" only reacts to the focused window; the active-window check covers it.
+    if (blockerAction === "switch") return
+
+    var names = []
+    var seen = Object.assign({}, _notifiedWindows)
     for (var i = 0; i < clients.length; i++) {
       var win = clients[i]
       if (!win || !win.address) continue
       var matchedApp = Model.findBlockedMatch(win, blockedWebApps)
-      if (matchedApp) {
-        if (blockerAction === "close") {
-          closeHyprlandWindow(win.address)
-          if (closedNames.indexOf(matchedApp.name) === -1) {
-            closedNames.push(matchedApp.name)
-          }
-        }
-      }
+      if (!matchedApp) continue
+      if (blockerAction === "close") closeHyprlandWindow(win.address)
+      else seen[win.address] = true
+      if (names.indexOf(matchedApp.name) === -1) names.push(matchedApp.name)
     }
+    _notifiedWindows = seen
 
-    if (closedNames.length > 0) {
-      blockedCountToday += closedNames.length
-      scheduleSave()
-      var notifTitle = "Focus Flow Blocker"
-      var notifBody = "Auto-closed " + closedNames.join(", ") + " for your focus session! 🎯"
-      var notifBin = (omarchyPath ? (omarchyPath + "/bin/omarchy-notification-send") : "omarchy-notification-send")
-      Quickshell.execDetached([notifBin, notifTitle, notifBody, "-g", "󰈈"])
+    if (names.length > 0) {
+      _bumpBlockedCount(names.length)
+      var body = blockerAction === "close"
+        ? "Closed " + names.join(", ") + " for this focus session."
+        : names.join(", ") + (names.length === 1 ? " is" : " are") + " open. Close " + (names.length === 1 ? "it" : "them") + " to stay in flow."
+      notify("FocusFlow", body, "󰈈")
     }
   }
 
@@ -408,6 +448,7 @@ Item {
     endAt = _now + totalMs
     running = true
     lastCompleted = ""
+    _notifiedWindows = ({})
     if (blockerEnabled && blockerScanOnStart) {
       Qt.callLater(scanAndEnforceAllWindows)
     }
@@ -450,22 +491,18 @@ Item {
     lastCompleted = ""
   }
 
+  // Skipping never counts as a completed session.
   function skipToNext() {
-    if (phase === "focus") {
-      complete()
-    } else if (phase === "break") {
-      startFocus()
-    } else {
-      startFocus()
-    }
+    if (phase === "focus") startBreak()
+    else startFocus()
   }
 
   function nudgeMinutes(deltaMinutes) {
     var deltaMs = deltaMinutes * 60 * 1000
     if (running) {
-      endAt += deltaMs
+      // Never nudge past the end: that would count an unfinished session.
+      endAt = Math.max(_now + 60000, endAt + deltaMs)
       totalMs = Math.max(60000, totalMs + deltaMs)
-      if (endAt <= _now) complete()
     } else if (phase !== "idle") {
       remainingMs = Math.max(60000, remainingMs + deltaMs)
       totalMs = Math.max(60000, totalMs + deltaMs)
@@ -482,22 +519,27 @@ Item {
     lastCompleted = completedPhase
     if (completedPhase === "focus") {
       _bumpActiveTaskPomos()
-      recordSession()
+      recordSession(Math.round(totalMs / 60000))
       var taskName = activeTask ? " · \"" + activeTask.title + "\"" : ""
-      remind("FocusFlow Studio", "Focus complete" + taskName + " — take a break! 🎉", "󰔛")
+      remind("FocusFlow", "Focus complete" + taskName + ". Time for a break.", "󰔛")
       if (autoStartBreak) startBreak()
       else phase = "idle"
     } else if (completedPhase === "break") {
-      remind("FocusFlow Studio", "Break over — ready to flow again 🚀", "󰅶")
+      remind("FocusFlow", "Break over. Ready to focus again?", "󰅶")
       if (autoStartFocus) startFocus()
       else phase = "idle"
     }
   }
 
-  function recordSession() {
+  function recordSession(minutes) {
+    var now = new Date()
+    var today = Model.dateKey(now)
     var list = sessions.slice()
-    list.push(Model.dateKey(new Date()))
-    sessions = Model.pruneSessions(list, new Date(), 400)
+    list.push(today)
+    sessions = Model.pruneSessions(list, now, 400)
+    var log = Model.pruneFocusLog(focusLog, now, 400)
+    log[today] = (log[today] || 0) + Math.max(0, minutes || 0)
+    focusLog = log
     scheduleSave()
   }
 
@@ -508,17 +550,14 @@ Item {
   property string overlayGlyph: "󰔛"
 
   function remind(title, body, glyph) {
-    if (soundAlert) {
-      Quickshell.execDetached(["canberra-gtk-play", "-i", "complete"])
-    }
+    if (soundAlert) playThemeSound("complete")
     if (reminderMode === "overlay") {
       overlayTitle = title
       overlayBody = body
       overlayGlyph = glyph
       overlayVisible = true
     } else {
-      var notifBin = (omarchyPath ? (omarchyPath + "/bin/omarchy-notification-send") : "omarchy-notification-send")
-      Quickshell.execDetached([notifBin, title, body, "-g", glyph])
+      notify(title, body, glyph)
     }
   }
 
@@ -530,16 +569,27 @@ Item {
     atomicWrites: true
     printErrors: false
     onLoaded: root.hydrate(text())
-    onLoadFailed: if (!root.loaded) legacyFile.path = root.home + "/.local/state/omarchy/focusflow.json"
+    onLoadFailed: if (!root.loaded) root._tryNextLegacyFile()
   }
 
-  // One-time migration: future reads and writes use Studio's own file.
+  // One-time migration: import the first legacy file that exists, then save
+  // to statePath from then on. Fresh installs fall through to defaults.
   FileView {
     id: legacyFile
     watchChanges: false
     printErrors: false
     onLoaded: { root.hydrate(text()); root.scheduleSave() }
-    onLoadFailed: { root.hydrate(""); root.scheduleSave() }
+    onLoadFailed: root._tryNextLegacyFile()
+  }
+
+  function _tryNextLegacyFile() {
+    if (loaded) return
+    if (_legacyIndex < legacyStatePaths.length) {
+      legacyFile.path = legacyStatePaths[_legacyIndex++]
+    } else {
+      hydrate("")
+      scheduleSave()
+    }
   }
 
   Timer {
@@ -569,6 +619,7 @@ Item {
     taskSoundAlert = data.taskSoundAlert === undefined ? true : data.taskSoundAlert === true
     dailyGoal      = Model.clampInt(data.dailyGoal, 4, 1, 30)
     sessions       = Model.validSessions(data.sessions)
+    focusLog       = Model.validFocusLog(data.focusLog)
 
     // Tasks
     var result = []
@@ -590,10 +641,13 @@ Item {
 
     // Blocker settings
     blockerEnabled     = data.blockerEnabled === undefined ? true : data.blockerEnabled === true
-    blockerAction      = (data.blockerAction === "switch" || data.blockerAction === "notify") ? data.blockerAction : "close"
+    blockerAction      = (data.blockerAction === "switch" || data.blockerAction === "close") ? data.blockerAction : "notify"
     blockerScanOnStart = data.blockerScanOnStart === undefined ? true : data.blockerScanOnStart === true
     blockedWebApps     = Model.validBlockedWebApps(data.blockedWebApps)
-    blockedCountToday  = parseInt(data.blockedCountToday, 10) || 0
+    var today = Model.dateKey(new Date())
+    blockedCountDate   = today
+    // Older files had no date; their count is a running total, not today's.
+    blockedCountToday  = data.blockedCountDate === today ? (parseInt(data.blockedCountToday, 10) || 0) : 0
 
     var runtime = data.runtime || {}
     if ((runtime.phase === "focus" || runtime.phase === "break") && Number(runtime.totalMs) > 0) {
@@ -619,13 +673,15 @@ Item {
       taskSoundAlert: taskSoundAlert,
       dailyGoal: dailyGoal,
       sessions: sessions,
+      focusLog: focusLog,
       tasks: tasks,
       activeTaskId: activeTaskId,
       blockerEnabled: blockerEnabled,
       blockerAction: blockerAction,
       blockerScanOnStart: blockerScanOnStart,
       blockedWebApps: blockedWebApps,
-      blockedCountToday: blockedCountToday
+      blockedCountToday: blockedCountToday,
+      blockedCountDate: blockedCountDate
     }, null, 2) + "\n")
   }
 
@@ -648,7 +704,7 @@ Item {
 
   Process {
     id: ensureDirProc
-    command: ["mkdir", "-p", root.home + "/.local/state/omarchy"]
+    command: ["mkdir", "-p", root.stateDir]
   }
 
   Component.onCompleted: {
@@ -664,6 +720,10 @@ Item {
     running: true
     onTriggered: {
       root._now = Date.now()
+      if (root.blockedCountToday > 0 && root.blockedCountDate !== Model.dateKey(new Date(root._now))) {
+        root.blockedCountToday = 0
+        root.blockedCountDate = Model.dateKey(new Date(root._now))
+      }
       if (root.running && root.endAt > 0 && root._now >= root.endAt)
         root.complete()
     }
@@ -676,7 +736,8 @@ Item {
     function onRawEvent(event) {
       if (!root.running || root.phase !== "focus" || !root.blockerEnabled) return
       var name = String(event && event.name ? event.name : "")
-      if (name === "openwindow" || name === "activewindow" || name === "activewindowv2") {
+      // Title events catch a browser tab switching to a blocked site.
+      if (name === "openwindow" || name === "activewindow" || name === "activewindowv2" || name === "windowtitle" || name === "windowtitlev2") {
         blockerDebounceTimer.restart()
       }
     }
@@ -695,10 +756,11 @@ Item {
   }
 
   Timer {
+    // Fallback for title changes Hyprland does not report as events.
     id: blockerPeriodicTimer
-    interval: 1500
+    interval: 4000
     repeat: true
-    running: root.running && root.phase === "focus" && root.blockerEnabled
+    running: root.running && root.phase === "focus" && root.blockerEnabled && root.activeBlockedCount > 0
     onTriggered: root.checkAndEnforceBlocker()
   }
 
@@ -730,7 +792,7 @@ Item {
 
   // ── IPC ────────────────────────────────────────────────────────────────────
   IpcHandler {
-    target: "focusflow-studio"
+    target: "zakarch.focusflow"
 
     function startFocus(): string   { root.startFocus();   return "ok" }
     function startBreak(): string   { root.startBreak();   return "ok" }
@@ -830,7 +892,7 @@ Item {
     visible: root.overlayVisible
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
-    WlrLayershell.namespace: "omarchy-focusflow-studio-overlay"
+    WlrLayershell.namespace: "zakarch-focusflow-overlay"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
     exclusionMode: ExclusionMode.Ignore
@@ -843,6 +905,14 @@ Item {
     MouseArea {
       anchors.fill: parent
       onClicked: root.overlayVisible = false
+    }
+
+    // The overlay takes exclusive keyboard focus, so it must also release it.
+    Item {
+      focus: root.overlayVisible
+      Keys.onEscapePressed: root.overlayVisible = false
+      Keys.onReturnPressed: root.overlayVisible = false
+      Keys.onSpacePressed: root.overlayVisible = false
     }
 
     BorderSurface {
@@ -876,10 +946,14 @@ Item {
         }
         Text {
           anchors.horizontalCenter: parent.horizontalCenter
+          width: Style.space(360) - Style.spacing.panelPadding * 2
+          horizontalAlignment: Text.AlignHCenter
+          wrapMode: Text.WordWrap
+          textFormat: Text.PlainText
           text: root.overlayBody
           font.family: Style.font.family
           font.pixelSize: Style.font.body
-          color: Qt.darker(Color.menu.text, 1.4)
+          color: Util.alpha(Color.menu.text, 0.75)
         }
         Button {
           anchors.horizontalCenter: parent.horizontalCenter

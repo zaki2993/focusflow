@@ -5,24 +5,25 @@ import qs.Commons
 import qs.Ui
 import "Model.js" as Model
 
-// FocusFlow Studio bar widget.
-// Displays live focus/break timers or open task count during idle.
+// FocusFlow bar widget.
+// Shows the running timer, or the open task count while idle.
 // Left-click → toggle panel. Middle-click → pause/resume. Right-click → reset.
 BarWidget {
   id: root
-  moduleName: "zakarch.focusflow-studio"
+  moduleName: "zakarch.focusflow"
 
-  readonly property var svc: bar && bar.shell ? bar.shell.serviceFor("zakarch.focusflow-studio") : null
+  readonly property var svc: bar && bar.shell ? bar.shell.serviceFor("zakarch.focusflow") : null
 
   // ── Icon & Text formatting ────────────────────────────────────────────────
   function barText() {
     if (!svc) return ""
-    return svc.phase === "idle" ? String(svc.openCount) : Model.formatRemaining(svc.remaining)
+    if (svc.phase !== "idle") return Model.formatRemaining(svc.remaining)
+    return svc.openCount > 0 ? String(svc.openCount) : ""
   }
 
   function tooltipText() {
-    if (!svc) return "FocusFlow Studio"
-    var lines = ["FocusFlow Studio"]
+    if (!svc) return "FocusFlow"
+    var lines = ["FocusFlow"]
     if (svc.phase !== "idle") {
       var state = svc.phase === "focus" ? "󱫠 Focus" : "󰅶 Break"
       if (svc.running) state += " · " + Model.formatRemaining(svc.remaining)
@@ -30,11 +31,12 @@ BarWidget {
       lines.push(state)
       if (svc.activeTask) {
         var prioTag = svc.activeTask.priority ? ("[" + Model.priorityLabel(svc.activeTask.priority) + "] ") : ""
-        lines.push("Active Task: " + prioTag + svc.activeTask.title)
+        lines.push("Task: " + prioTag + svc.activeTask.title)
       }
     }
     var focusTimeText = svc.totalFocusMinutesToday > 0 ? (" · " + Model.formatMinutes(svc.totalFocusMinutesToday) + " focused") : ""
-    lines.push("Today: " + svc.countToday + " sessions" + focusTimeText + " · " + svc.openCount + " open tasks")
+    lines.push("Today: " + svc.countToday + "/" + svc.dailyGoal + " sessions" + focusTimeText + " · " + svc.openCount + " open tasks")
+    lines.push("Middle-click: pause/resume · Right-click: reset")
     return lines.join("\n")
   }
 
@@ -73,12 +75,10 @@ BarWidget {
   }
 
   IpcHandler {
-    target: "zakarch.focusflow-studio.widget"
+    target: "zakarch.focusflow.widget"
     function open(): void   { root.open() }
     function close(): void  { root.close() }
     function toggle(): void { root.togglePanel() }
-    function iconVersion(): string { return "orbital-1" }
-    function layout(): string { return panelLoader.item ? panelLoader.item.layoutStatus() : "loading" }
     function settings(section: string): void { if (panelLoader.item) panelLoader.item.showSettings(section) }
     function setTab(tab: string): void {
       if (panelLoader.item) {

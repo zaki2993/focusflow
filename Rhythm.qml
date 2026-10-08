@@ -17,13 +17,14 @@ Rectangle {
     return result
   }
   readonly property int maxCount: Math.max(1, ...days.map(function(d){return d.count}))
+  readonly property int total: days.reduce(function(sum, d){ return sum + d.count }, 0)
   Row {
     anchors.fill: parent; anchors.margins: 14; spacing: 10
     Column {
       width: Math.min(150, parent.width*0.28); spacing: 4
-      Text { text: "THIS WEEK"; color: Util.alpha(Color.popups.text, 0.65); font.family: Style.font.family; font.pixelSize: 9; font.letterSpacing: 1.7 }
-      Text { text: root.svc ? String(root.svc.countWeek) : "0"; color: Color.popups.text; font.family: Style.font.family; font.pixelSize: 26 }
-      Text { text: "sessions"; color: Util.alpha(Color.popups.text, 0.65); font.family: Style.font.family; font.pixelSize: 10 }
+      Text { text: "LAST 7 DAYS"; color: Util.alpha(Color.popups.text, 0.65); font.family: Style.font.family; font.pixelSize: Style.font.caption; font.letterSpacing: 1.2 }
+      Text { text: String(root.total); color: Color.popups.text; font.family: Style.font.family; font.pixelSize: Style.font.display }
+      Text { text: root.total === 1 ? "session" : "sessions"; color: Util.alpha(Color.popups.text, 0.65); font.family: Style.font.family; font.pixelSize: Style.font.caption }
     }
     Row {
       width: parent.width - parent.children[0].width - parent.spacing
@@ -44,9 +45,9 @@ Rectangle {
               opacity: modelData.count ? 1 : 0.28
               Behavior on height { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
             }
-            Text { anchors.horizontalCenter: parent.horizontalCenter; y: 0; text: modelData.count || "·"; color: modelData.today ? root.accent : Util.alpha(Color.popups.text, 0.65); font.family: Style.font.family; font.pixelSize: 9 }
+            Text { anchors.horizontalCenter: parent.horizontalCenter; y: 0; text: modelData.count || "·"; color: modelData.today ? root.accent : Util.alpha(Color.popups.text, 0.65); font.family: Style.font.family; font.pixelSize: Style.font.caption }
           }
-          Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.label; color: modelData.today ? root.accent : Util.alpha(Color.popups.text, 0.65); font.family: Style.font.family; font.pixelSize: 8; font.letterSpacing: 0.5 }
+          Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.label; color: modelData.today ? root.accent : Util.alpha(Color.popups.text, 0.65); font.family: Style.font.family; font.pixelSize: Style.font.caption; font.letterSpacing: 0.3 }
         }
       }
     }
